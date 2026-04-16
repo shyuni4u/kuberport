@@ -196,9 +196,43 @@ kuberport/
 ```
 Turborepo/nx 같은 모노레포 도구는 MVP에 과함 — 단순 디렉터리 분리로 시작.
 
+## 11. 운영 호스팅: Hetzner Cloud + k3s 단일 노드
+
+상세 근거와 대안 비교는 [ADR 0002](decisions/0002-production-hosting-hetzner-k3s.md).
+
+| 레이어 | 선택 |
+|--------|------|
+| VM | Hetzner CAX21 (ARM, 4 vCPU / 8GB / 80GB SSD, €7/월) |
+| k8s | k3s single-node (Traefik Ingress 내장) |
+| TLS | cert-manager + Let's Encrypt |
+| DNS | Cloudflare (무료) |
+| 이미지 레지스트리 | GitHub Container Registry (`ghcr.io`) |
+| 이미지 아키텍처 | `linux/arm64` (+ `linux/amd64` 선택, `docker buildx`) |
+| CI | GitHub Actions |
+| CD (초기) | GitHub Actions → ssh → `helm upgrade` |
+| CD (장기) | ArgoCD (k3s 내부 pull 기반 GitOps) |
+
+**예상 월 고정비: 약 €8 (~₩11,000)**
+
+**배제한 대안**
+- Oracle Cloud Always Free — 사용 불가
+- GCP $300 + GKE Autopilot — 90일 후 $40~70/월, 장기 운영 비경제
+- Civo / DigitalOcean Managed K8s — 크레딧 소진 후 ~$25/월, Hetzner 대비 3~4배
+
+**주요 리스크와 완화**
+- 단일 노드 SPOF → Hetzner 스냅샷 + `pg_dump` 외부 백업. 성장 시 2노드 k3s HA로 확장.
+- ARM 이미지 호환성 → `docker buildx` 멀티아키 빌드, 서드파티 이미지는 `docker manifest inspect` 확인.
+
+**Helm chart 설계 시 기억할 k3s 특수성**
+- Ingress class = `traefik`
+- `LoadBalancer` 서비스는 `servicelb` 로 호스트 포트(80/443) 점유
+- 기본 StorageClass = `local-path` (노드 로컬 디스크)
+- 외부 MetalLB/cloud LB 컨트롤러 없음 (단일 노드 전제)
+
 ## 미해결 (다음 브레인스토밍 토픽)
 
 1. UI 목업 — 템플릿 해부도 / 관리자 템플릿 편집기(YAML/UI 토글) / 사용자 카탈로그 / 배포 폼 / 릴리스 상세
 2. 데이터 모델 상세 — Template, Release, Cluster, User 테이블 스키마 + 관계
 3. API 디자인 개요 — 주요 엔드포인트
 4. 디자인 스펙 문서 작성 — `docs/superpowers/specs/YYYY-MM-DD-initial-design.md`
+5. **OIDC IdP 선택** — Google OAuth vs 자가호스팅 Keycloak (ADR 예정)
