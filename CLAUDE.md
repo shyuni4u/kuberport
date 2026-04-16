@@ -57,10 +57,23 @@ kuberport/
 ├── CLAUDE.md                              ← 이 파일 (세션 진입점)
 ├── docs/
 │   ├── brainstorming-summary.md           ← 브레인스토밍 결정 요약
+│   ├── dev-setup.md                       ← 개발 환경 설정 가이드
 │   ├── superpowers/
 │   │   └── specs/                         ← 디자인 스펙 (다음 단계에 생성)
 │   └── decisions/                         ← ADR (필요 시 생성)
 ```
+
+## 개발 환경
+
+로컬 빌드/실행이 안 되거나 새 머신에 처음 클론했다면 → [docs/dev-setup.md](docs/dev-setup.md).
+
+**Windows 사용자 핵심 요점 (시간 없으면 이것만)**:
+1. 리포를 **OneDrive 밖 + ASCII 경로**로 옮긴다 (예: `C:\dev\kuberport`). OneDrive 동기화 + 한글 경로는 `go build` / `pnpm install` 잠금 오류의 주원인.
+2. **WSL2 + Ubuntu** 에 코드를 두고 (`~/dev/kuberport`), Docker Desktop 의 WSL Integration 을 켜고, VS Code 는 **Remote-WSL** 로 연다.
+3. `/mnt/c/...` 경로에 코드를 두지 않는다 — IO 가 5~20배 느리다.
+4. 툴(`go`, `node`, `pnpm`, `atlas`, `kubectl`, `docker`)은 **WSL 쪽**에 설치. Windows 쪽 설치와 섞이면 PATH 충돌.
+
+macOS/Linux 는 그냥 Homebrew/apt 로 설치. 자세한 단계·검증 커맨드·함정 체크리스트는 `docs/dev-setup.md` 참조.
 
 ## 작업 시 규칙
 
