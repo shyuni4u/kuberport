@@ -4,7 +4,7 @@
 
 **Goal:** Ship the thinnest end-to-end slice of `kuberport`: an admin can log in, register a cluster, author a template in **YAML mode only**, publish v1, a user can then deploy that template via a generated form and see the deployed release's summary status.
 
-**Architecture:** Go API (Gin + client-go + sqlc + atlas) talking to Postgres and multiple target k8s clusters, fronted by a Next.js 15 app on Vercel that handles OIDC via `openid-client` and proxies `/api/v1/*` to Go with `Authorization: Bearer <id_token>` injected from a server-side session. Every k8s write uses the user's own token so k8s RBAC is the security source of truth.
+**Architecture:** Go API (Gin + client-go + sqlc + atlas) talking to Postgres and multiple target k8s clusters, fronted by a Next.js 15 app running as a k8s `Deployment` in the same Helm chart as the Go API (see ADR 0001). The Next.js app handles OIDC via `openid-client` and proxies `/api/v1/*` to Go with `Authorization: Bearer <id_token>` injected from a server-side session. Every k8s write uses the user's own token so k8s RBAC is the security source of truth.
 
 **Tech Stack:** Go 1.22, Gin, client-go, sqlc, atlas, pgx, coreos/go-oidc, Next.js 15 (App Router), React 18, TypeScript, Tailwind, shadcn/ui, Monaco Editor, React Hook Form, Zod, `openid-client`, `iron-session`, PostgreSQL 16, Docker.
 
@@ -187,7 +187,6 @@ backend/vendor/
 frontend/node_modules/
 frontend/.next/
 frontend/out/
-frontend/.vercel/
 
 # Docker
 *.pid
@@ -2681,14 +2680,27 @@ export default function Home() {
 }
 ```
 
-- [ ] **Step 5: Smoke build**
+- [ ] **Step 5: Enable standalone output for future Helm chart packaging**
+
+Edit `frontend/next.config.ts` (or `.js` if present) to include:
+
+```ts
+const nextConfig = {
+  output: 'standalone',
+};
+export default nextConfig;
+```
+
+Rationale: per [ADR 0001](../../decisions/0001-frontend-deployment-helm-over-vercel.md) the frontend ships inside the same Helm chart as the Go API. `standalone` builds produce a self-contained Node server at `.next/standalone/` that a minimal Dockerfile (deferred to a later plan) can COPY directly. Setting this now avoids a reconfigure churn later.
+
+- [ ] **Step 6: Smoke build**
 
 ```bash
 pnpm build
 ```
-Expected: success, no TS errors.
+Expected: success, no TS errors. Verify that `frontend/.next/standalone/server.js` exists after the build.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add frontend/
@@ -3982,5 +3994,6 @@ git commit -m "docs: fill in README with setup and test commands"
 - Release settings tab
 - Release update-available notifications + migration flow
 - Release update (PUT /v1/releases/:id re-apply)
-- Helm chart for deploying `kuberport` itself
-- Production Dockerfile hardening
+- Helm chart for deploying `kuberport` itself (backend `Deployment` + frontend `Deployment` + single `Ingress` with path routing per ADR 0001)
+- Frontend production Dockerfile (multi-stage, copy `.next/standalone` into `node:*-alpine`) + image publish pipeline
+- Backend production Dockerfile hardening

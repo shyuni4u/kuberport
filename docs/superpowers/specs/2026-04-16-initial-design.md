@@ -2,11 +2,12 @@
 
 | | |
 |---|---|
-| 버전 | 0.1 (draft) |
+| 버전 | 0.2 (draft) |
 | 날짜 | 2026-04-16 |
 | 상태 | **사용자 리뷰 대기** |
 | 범위 | MVP + v1.1 큰 틀. v2+는 언급만 |
 | 이전 문서 | [CLAUDE.md](../../../CLAUDE.md), [docs/brainstorming-summary.md](../../brainstorming-summary.md) |
+| 변경 이력 | v0.2 (2026-04-16) — Frontend 배포를 Vercel → k8s Pod (Helm chart 통합) 로 변경. 상세: [ADR 0001](../../decisions/0001-frontend-deployment-helm-over-vercel.md). · v0.1 (2026-04-16) — 초안. |
 
 이 문서는 브레인스토밍 결과를 통합한 **구현 전 최종 스펙**이다. 승인 후 이 문서를 바탕으로 implementation plan(`writing-plans` 스킬)을 작성한다.
 
@@ -144,8 +145,8 @@ MVP 이후 추가 예정: `secret`(비밀값), `object`(중첩), `array`(동적 
 ### 4.1 컴포넌트 5개
 
 ```
-┌─ Browser ─┐     ┌─ Next.js (Vercel) ─┐     ┌─ Go API (k8s Pod) ─┐     ┌─ Target k8s ─┐
-│ Next.js  │◀───▶│ Route Handler (BFF)│◀───▶│ Gin + client-go     │◀──▶│ dev/stg/prod │
+┌─ Browser ─┐     ┌─ Next.js (k8s Pod) ─┐    ┌─ Go API (k8s Pod) ─┐     ┌─ Target k8s ─┐
+│ Next.js  │◀───▶│ Route Handler (BFF) │◀──▶│ Gin + client-go     │◀──▶│ dev/stg/prod │
 │ SPA      │     │ httpOnly cookie    │     │ template render     │    └──────────────┘
 │ (Monaco) │     │ OIDC callback      │     │ token forwarding    │
 └──────────┘     └────────────────────┘     └──────────┬──────────┘
@@ -160,7 +161,7 @@ MVP 이후 추가 예정: `secret`(비밀값), `object`(중첩), `array`(동적 
 | 컴포넌트 | 역할 | 배포 위치 |
 |----------|------|-----------|
 | Browser (Next.js SPA) | 모든 UI 렌더링 | 사용자 브라우저 |
-| Next.js Route Handler | OIDC 콜백, 서버 세션, Go API 프록시 (BFF) | Vercel (Edge/Node runtime) |
+| Next.js Route Handler | OIDC 콜백, 서버 세션, Go API 프록시 (BFF) | k8s control 클러스터 Pod (backend와 동일 Helm chart) |
 | Go API Server | 비즈니스 로직, k8s 호출, DB 액세스 | k8s control 클러스터 Pod |
 | App DB (Postgres) | 템플릿/릴리스 메타 + 세션 | k8s Pod 또는 managed Postgres |
 | OIDC Provider | 사용자 인증 | 외부 (Google/Keycloak 등) |
@@ -238,7 +239,7 @@ Go API  ──merge DB meta + live k8s state, abstract terms──▶ Browser
 
 | 영역 | 선택 | 이유 |
 |------|------|------|
-| 프레임워크 | Next.js 15 (App Router) | Vercel 네이티브, BFF 패턴 지원 |
+| 프레임워크 | Next.js 15 (App Router) | BFF 패턴 지원, `output: 'standalone'` 로 컨테이너화 용이 |
 | 스타일 | Tailwind + shadcn/ui | 빠른 레이아웃, 접근성 좋은 컴포넌트 |
 | YAML 에디터 | Monaco (`@monaco-editor/react`, `dynamic import`) | VSCode 엔진, YAML/JSON schema 지원 |
 | 폼 | React Hook Form + Zod | ui-spec → 동적 폼에 적합 |
@@ -257,7 +258,7 @@ Go API  ──merge DB meta + live k8s state, abstract terms──▶ Browser
 ### 5.4 배포
 
 - 백엔드: Docker multi-stage build → Helm chart → k8s Pod
-- 프론트엔드: Vercel (Git push 연동)
+- 프론트엔드: Next.js `output: 'standalone'` 빌드 → Docker multi-stage → **같은 Helm chart 내 별도 Deployment + Service**. 단일 Ingress 에서 path 기반 라우팅 (`/api/*` → backend, 그 외 → frontend). 근거: [ADR 0001](../../decisions/0001-frontend-deployment-helm-over-vercel.md).
 - Postgres: MVP에선 Helm chart 내 StatefulSet, 운영은 managed DB 권장 (RDS, CloudSQL 등)
 
 ### 5.5 레포 구조
@@ -423,7 +424,7 @@ metadata:
 ### 7.1 전체 경계
 
 ```
-Browser ──▶ Next.js Route Handler (Vercel)
+Browser ──▶ Next.js Route Handler (k8s Pod)
              ├─ /auth/*                 세션/OIDC 콜백
              └─ /api/v1/*               Go API 프록시
 Next.js ──▶ Go API (k8s Pod)
@@ -612,23 +613,28 @@ helm install kuberport kuberport/kuberport \
 ```
 
 Helm chart가 포함하는 것:
-- `Deployment` — Go API 서버 (수평 확장 가능, stateless)
-- `Service` + `Ingress` — 외부 노출
+- `Deployment` (backend) — Go API 서버 (수평 확장 가능, stateless)
+- `Deployment` (frontend) — Next.js standalone Node 서버 (수평 확장 가능, stateless)
+- `Service` × 2 — backend / frontend 내부 노출
+- `Ingress` — 단일 호스트, path 기반 라우팅 (`/api/*` → backend Service, 그 외 → frontend Service)
 - `ServiceAccount` + `ClusterRole` — 자체 권한 (리소스 생성 권한 없음, 메타데이터 읽기만)
-- `Secret` — OIDC client secret, DB credential, AES 키
+- `Secret` — OIDC client secret, DB credential, AES 키, `SESSION_ENCRYPTION_KEY`
+- `ConfigMap` — 비민감 환경변수 (`GO_API_BASE_URL=http://kuberport-backend:8080`, `NEXT_PUBLIC_APP_NAME`, `OIDC_ISSUER` 등)
 - `StatefulSet` for Postgres (optional, `db.embedded=true` 시)
 
-### 11.2 프론트엔드 (Vercel)
+### 11.2 프론트엔드 (Helm chart 에 통합)
 
-- Git 리포 연동 → push 시 자동 배포
-- Preview deployment = PR마다 생성
-- 환경변수: `NEXT_PUBLIC_APP_NAME`, `GO_API_BASE_URL`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `SESSION_ENCRYPTION_KEY`, `DB_URL` (세션 저장용)
+- **이미지 빌드**: Next.js `output: 'standalone'` + Docker multi-stage. 최종 이미지는 `node:*-alpine` 위에 `.next/standalone` + `public/` + `.next/static` 만 담아 경량화.
+- **런타임**: `Deployment` (replicas 조정 가능), readinessProbe `/api/health` (Next.js Route Handler).
+- **Backend 통신**: 클러스터 내부 Service DNS 로 접근 → `GO_API_BASE_URL=http://kuberport-backend:8080`. public internet 을 거치지 않음.
+- **환경변수** (ConfigMap / Secret):
+  - `NEXT_PUBLIC_APP_NAME`, `GO_API_BASE_URL` (ConfigMap)
+  - `OIDC_ISSUER`, `OIDC_CLIENT_ID` (ConfigMap)
+  - `OIDC_CLIENT_SECRET`, `SESSION_ENCRYPTION_KEY`, `DB_URL` (Secret)
+- **세션 저장소**: Next.js BFF 도 Postgres 에 세션을 저장한다. backend 와 **같은 Postgres** 를 공유 (같은 클러스터 내부 Service DNS 로 접근) → 별도 DB 인스턴스 불필요.
+- **PR preview deployment** 는 MVP 범위 밖. 로컬 docker-compose 또는 staging 클러스터 배포로 대체.
 
-Next.js BFF도 Postgres에 세션을 저장해야 하므로 **DB 접근**이 필요. 구성 옵션:
-- Go API와 같은 Postgres 공유 (간단)
-- 또는 Vercel Postgres / Neon 별도 (Vercel 친화적)
-
-MVP는 같은 Postgres 공유 → Vercel에서 외부 DB 접근 가능하게 네트워크 설정.
+근거와 포기한 대안(Vercel)의 전체 논의는 [ADR 0001](../../decisions/0001-frontend-deployment-helm-over-vercel.md) 참조.
 
 ### 11.3 첫 번째 설치 플로우 (부트스트랩)
 

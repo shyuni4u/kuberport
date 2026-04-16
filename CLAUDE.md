@@ -41,7 +41,7 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 | Frontend | YAML 에디터 | Monaco (`dynamic import`) |
 | Frontend | 폼 | React Hook Form + Zod |
 | Frontend | OIDC | `openid-client` + httpOnly 쿠키 |
-| Frontend | 배포 | Vercel |
+| Frontend | 배포 | k8s Pod (backend와 같은 Helm chart — 단일 Ingress path 라우팅). 근거: [ADR 0001](docs/decisions/0001-frontend-deployment-helm-over-vercel.md) |
 | 통신 | 패턴 | **BFF** — Browser → Next.js Route Handler → Go API → k8s API |
 | 레포 | 구성 | 단일 레포, `backend/` `frontend/` `deploy/` 분리 |
 

@@ -123,7 +123,7 @@
 
 5개 컴포넌트 구성:
 - **Browser** — Next.js SPA, 사용자 인터페이스
-- **Next.js (BFF)** — Vercel에 배포, 인증 콜백 처리 + Go 백엔드 프록시
+- **Next.js (BFF)** — k8s Pod로 배포 (backend와 동일 Helm chart), 인증 콜백 처리 + Go 백엔드 프록시
 - **API Server (Go)** — k8s control 클러스터에 Pod로 배포, client-go 사용
 - **App DB (Postgres/SQLite)** — 템플릿 + 릴리스 메타 + 클러스터 등록
 - **OIDC Provider** — 외부 (Google/Keycloak/...)
@@ -158,17 +158,17 @@
 
 | 영역 | 결정 | 이유 |
 |------|------|------|
-| 프레임워크 | **Next.js 15 (App Router)** | Vercel 네이티브, OIDC 콜백 서버 처리, 미들웨어 auth guard |
+| 프레임워크 | **Next.js 15 (App Router)** | Route Handler 로 BFF 구현, 미들웨어 auth guard, `output: 'standalone'` 로 컨테이너화 용이 |
 | 스타일 | Tailwind + shadcn/ui | 빠른 레이아웃 + 접근성 좋은 컴포넌트 |
 | YAML 에디터 | Monaco Editor | VSCode와 같은 엔진, `dynamic import`로 SSR 우회 |
 | 폼 라이브러리 | React Hook Form + Zod | ui-spec → 동적 폼 생성에 적합 |
 | OIDC | `openid-client` | Node 환경 표준 OIDC 클라이언트 |
-| 배포 | Vercel | Next.js 네이티브 플랫폼 |
+| 배포 | k8s Pod (backend와 같은 Helm chart) | self-hosted 통합 설치 우선. 단일 Ingress 에서 `/api/*` ↔ `/*` path 라우팅. 상세 근거는 [ADR 0001](decisions/0001-frontend-deployment-helm-over-vercel.md) |
 
 **Vite 대신 Next.js를 선택한 이유**:
 1. OIDC 콜백을 Next.js Route Handler에서 서버 사이드 처리 → 토큰을 **httpOnly 쿠키**에 저장 → XSS 내성 (이 앱은 k8s 자격증명을 다루므로 보안 차이가 크다)
-2. `middleware.ts`로 인증 가드를 엣지 레벨에서 처리 → 페이지 깜빡임 없음
-3. Vercel + Next.js = zero-config / Vercel + Vite = 그냥 "정적 사이트"
+2. `middleware.ts`로 인증 가드를 엣지/서버 레벨에서 처리 → 페이지 깜빡임 없음
+3. `output: 'standalone'` 로 self-contained Node 이미지가 나와 backend와 같은 Helm chart 에 담기 쉬움 — Vite SPA 는 정적 호스팅 컨테이너가 별도로 필요
 4. BFF 패턴(Route Handler 프록시)으로 CORS 설정 제거
 
 ### 통신 패턴: BFF (Backend-for-Frontend)
@@ -180,8 +180,7 @@ Browser  ─→  Next.js Route Handler  ─→  Go API  ─→  k8s API
 
 **A (BFF)를 B (직접 호출)보다 선택한 이유**:
 - 토큰이 브라우저 JS에 아예 노출 안 됨 (진짜 httpOnly)
-- CORS 설정 0
-- 내부 툴이라 트래픽 작아 Vercel 함수 invocation 비용 무시 가능
+- CORS 설정 0 (단일 origin, Ingress 내부 path 라우팅)
 - 한 곳에서 요청 감시/로깅 가능
 
 **아키텍처 경계 원칙**: 비즈니스 로직은 Go 백엔드에만. Next.js Route Handler는 **인증 쿠키 관리 + 얇은 프록시** 역할만. 개발자가 Next.js API에 로직을 스며들게 하는 유혹이 있어 CLAUDE.md에 명시.
