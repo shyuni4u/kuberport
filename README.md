@@ -134,4 +134,4 @@ Not yet open to outside contributions — the shape of the system is still stabi
 
 ## License
 
-To be decided before the first public push. Likely Apache-2.0.
+[Apache License 2.0](LICENSE) — free to use, modify, and redistribute, provided the copyright notice and license text are preserved.
