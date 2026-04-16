@@ -10,9 +10,11 @@ import (
 
 func main() {
 	cfg := config.Config{
-		ListenAddr:  getenv("LISTEN_ADDR", ":8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		OIDCIssuer:  os.Getenv("OIDC_ISSUER"),
+		ListenAddr:          getenv("LISTEN_ADDR", ":8080"),
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		OIDCIssuer:          os.Getenv("OIDC_ISSUER"),
+		OIDCAudience:        os.Getenv("OIDC_AUDIENCE"),
+		AppEncryptionKeyB64: os.Getenv("APP_ENCRYPTION_KEY_B64"),
 	}
 	r := api.NewRouter(cfg)
 	log.Printf("listening on %s", cfg.ListenAddr)
