@@ -141,6 +141,12 @@ table "templates" {
     ref_columns = [table.users.column.id]
     on_delete   = RESTRICT
   }
+  foreign_key "t_current_version_fk" {
+    columns     = [column.current_version_id]
+    ref_columns = [table.template_versions.column.id]
+    on_delete   = SET_NULL
+    on_update   = NO_ACTION
+  }
 }
 
 table "template_versions" {
