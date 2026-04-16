@@ -1,5 +1,7 @@
 # kuberport
 
+**English** | [한국어](README.ko.md)
+
 > Template-driven self-service portal for Kubernetes.
 > Admins publish YAML + ui-spec templates; non-experts deploy and operate via abstracted forms.
 
