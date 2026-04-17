@@ -6,11 +6,13 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"kuberport/internal/config"
+	"kuberport/internal/store"
 )
 
 type Deps struct {
 	Verifier TokenVerifier
-	// Store, K8sFactory added in later tasks
+	Store    *store.Store
+	// K8sFactory added in later tasks
 }
 
 type Handlers struct {
@@ -26,5 +28,7 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 	h := &Handlers{deps: deps}
 	v := r.Group("/v1", requireAuth(deps.Verifier))
 	v.GET("/me", h.GetMe)
+	v.GET("/clusters", h.ListClusters)
+	v.POST("/clusters", requireAdmin(), h.CreateCluster)
 	return r
 }

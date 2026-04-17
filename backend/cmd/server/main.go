@@ -8,6 +8,7 @@ import (
 	"kuberport/internal/api"
 	"kuberport/internal/auth"
 	"kuberport/internal/config"
+	"kuberport/internal/store"
 )
 
 func main() {
@@ -22,12 +23,22 @@ func main() {
 	if cfg.OIDCIssuer == "" || cfg.OIDCAudience == "" {
 		log.Fatal("OIDC_ISSUER and OIDC_AUDIENCE are required (local dev: OIDC_ISSUER=http://localhost:5556 OIDC_AUDIENCE=kuberport)")
 	}
-	verifier, err := auth.NewVerifier(context.Background(), cfg.OIDCIssuer, cfg.OIDCAudience)
+	if cfg.DatabaseURL == "" {
+		log.Fatal("DATABASE_URL is required (local dev: postgres://kuberport:kuberport@localhost:5432/kuberport?sslmode=disable)")
+	}
+
+	ctx := context.Background()
+	verifier, err := auth.NewVerifier(ctx, cfg.OIDCIssuer, cfg.OIDCAudience)
 	if err != nil {
 		log.Fatalf("OIDC verifier init: %v", err)
 	}
+	st, err := store.NewStore(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("store init: %v", err)
+	}
+	defer st.Close()
 
-	r := api.NewRouter(cfg, api.Deps{Verifier: verifier})
+	r := api.NewRouter(cfg, api.Deps{Verifier: verifier, Store: st})
 	log.Printf("listening on %s", cfg.ListenAddr)
 	if err := r.Run(cfg.ListenAddr); err != nil {
 		log.Fatal(err)

@@ -1330,7 +1330,7 @@ git commit -m "feat(backend): auth middleware with RFC 7807 errors and /v1/me"
 - Test: `backend/internal/api/clusters_test.go`
 - Modify: `backend/internal/api/routes.go`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Path: `backend/internal/api/clusters_test.go`
 ```go
@@ -1386,7 +1386,7 @@ func TestClusters_Register_AdminSucceeds(t *testing.T) {
 
 Add `testStore(t)` helper that returns a live `*store.Store` from the env DSN, and `randSuffix()` returns a short time-based slug.
 
-- [ ] **Step 2: Implement the handler**
+- [x] **Step 2: Implement the handler**
 
 Path: `backend/internal/api/clusters.go`
 ```go
@@ -1448,13 +1448,13 @@ v.POST("/clusters", requireAdmin(), h.CreateCluster)
 
 Add `Store *store.Store` to `Deps` and `pgText` helper.
 
-- [ ] **Step 3: Run — expect PASS**
+- [x] **Step 3: Run — expect PASS**
 
 ```bash
 cd backend && go test ./internal/api/... -run Clusters
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/internal/api/
