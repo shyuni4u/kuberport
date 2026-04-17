@@ -1471,7 +1471,7 @@ git commit -m "feat(backend): register and list clusters (admin-only write)"
 - Create: `backend/internal/template/render.go`
 - Test: `backend/internal/template/render_test.go`
 
-- [ ] **Step 1: Write the render test**
+- [x] **Step 1: Write the render test**
 
 Path: `backend/internal/template/render_test.go`
 ```go
@@ -1562,13 +1562,13 @@ func TestRender_ValidatesMin(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run — expect failure**
+- [x] **Step 2: Run — expect failure**
 
 ```bash
 cd backend && go test ./internal/template/...
 ```
 
-- [ ] **Step 3: Implement `spec.go`**
+- [x] **Step 3: Implement `spec.go`**
 
 Path: `backend/internal/template/spec.go`
 ```go
@@ -1649,7 +1649,7 @@ func toInt(v any) (int, bool) {
 }
 ```
 
-- [ ] **Step 4: Implement `jsonpath.go` — tiny path resolver understanding `Kind[name].a.b.c[0].d`**
+- [x] **Step 4: Implement `jsonpath.go` — tiny path resolver understanding `Kind[name].a.b.c[0].d`**
 
 Path: `backend/internal/template/jsonpath.go`
 ```go
@@ -1760,7 +1760,7 @@ func ensureMap(m map[string]any, key string) map[string]any {
 }
 ```
 
-- [ ] **Step 5: Implement `render.go`**
+- [x] **Step 5: Implement `render.go`**
 
 Path: `backend/internal/template/render.go`
 ```go
@@ -1873,13 +1873,13 @@ func stampLabels(obj map[string]any, l Labels) {
 func bytesReader(b []byte) *bytes.Reader { return bytes.NewReader(b) }
 ```
 
-- [ ] **Step 6: Run — expect PASS**
+- [x] **Step 6: Run — expect PASS**
 
 ```bash
 cd backend && go test ./internal/template/...
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/internal/template/
