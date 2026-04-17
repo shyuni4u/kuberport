@@ -36,21 +36,38 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	u, _ := auth.UserFrom(ctx)
-	user, err := h.deps.Store.UpsertUser(ctx, store.UpsertUserParams{
-		OidcSubject: u.Subject,
-		Email:       store.PgText(u.Email),
-		DisplayName: store.PgText(u.Name),
-	})
-	if err != nil {
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	tpl, err := h.deps.Store.InsertTemplate(ctx, store.InsertTemplateParams{
-		Name:        r.Name,
-		DisplayName: r.DisplayName,
-		Description: store.PgText(r.Description),
-		Tags:        r.Tags,
-		OwnerUserID: user.ID,
+
+	var tpl store.Template
+	var tv store.TemplateVersion
+	err := h.deps.Store.WithTx(ctx, func(q *store.Queries) error {
+		user, err := q.UpsertUser(ctx, store.UpsertUserParams{
+			OidcSubject: u.Subject,
+			Email:       store.PgText(u.Email),
+			DisplayName: store.PgText(u.Name),
+		})
+		if err != nil {
+			return err
+		}
+		tpl, err = q.InsertTemplate(ctx, store.InsertTemplateParams{
+			Name:        r.Name,
+			DisplayName: r.DisplayName,
+			Description: store.PgText(r.Description),
+			Tags:        r.Tags,
+			OwnerUserID: user.ID,
+		})
+		if err != nil {
+			return err
+		}
+		tv, err = q.InsertTemplateVersion(ctx, store.InsertTemplateVersionParams{
+			TemplateID:      tpl.ID,
+			Version:         1,
+			ResourcesYaml:   r.ResourcesYAML,
+			UiSpecYaml:      r.UISpecYAML,
+			MetadataYaml:    store.PgText(r.MetadataYAML),
+			Status:          "draft",
+			CreatedByUserID: user.ID,
+		})
+		return err
 	})
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -58,19 +75,6 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 			writeError(c, http.StatusConflict, "conflict", "template name already exists")
 			return
 		}
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	tv, err := h.deps.Store.InsertTemplateVersion(ctx, store.InsertTemplateVersionParams{
-		TemplateID:      tpl.ID,
-		Version:         1,
-		ResourcesYaml:   r.ResourcesYAML,
-		UiSpecYaml:      r.UISpecYAML,
-		MetadataYaml:    store.PgText(r.MetadataYAML),
-		Status:          "draft",
-		CreatedByUserID: user.ID,
-	})
-	if err != nil {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
@@ -142,15 +146,26 @@ func (h *Handlers) PublishVersion(c *gin.Context) {
 		writeError(c, http.StatusNotFound, "not-found", "template version")
 		return
 	}
-	published, err := h.deps.Store.PublishTemplateVersion(ctx, existing.ID)
+
+	var published store.TemplateVersion
+	var notDraft bool
+	err = h.deps.Store.WithTx(ctx, func(q *store.Queries) error {
+		pub, err := q.PublishTemplateVersion(ctx, existing.ID)
+		if err != nil {
+			notDraft = true
+			return err
+		}
+		published = pub
+		return q.UpdateTemplateCurrentVersion(ctx, store.UpdateTemplateCurrentVersionParams{
+			ID:               existing.TemplateID,
+			CurrentVersionID: pub.ID,
+		})
+	})
 	if err != nil {
-		writeError(c, http.StatusConflict, "conflict", "version not in draft state")
-		return
-	}
-	if err := h.deps.Store.UpdateTemplateCurrentVersion(ctx, store.UpdateTemplateCurrentVersionParams{
-		ID:               existing.TemplateID,
-		CurrentVersionID: published.ID,
-	}); err != nil {
+		if notDraft {
+			writeError(c, http.StatusConflict, "conflict", "version not in draft state")
+			return
+		}
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}

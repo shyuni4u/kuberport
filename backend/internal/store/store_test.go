@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -38,6 +39,33 @@ func TestUpsertUser(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "alice@example.com", u.Email.String)
+}
+
+func TestStore_WithTx_RollsBackOnError(t *testing.T) {
+	ctx := context.Background()
+	s, err := store.NewStore(ctx, testDSN(t))
+	require.NoError(t, err)
+	defer s.Close()
+
+	stamp := time.Now().Format("150405.000000")
+	name := "rollback-" + stamp
+
+	sentinel := errors.New("sentinel rollback trigger")
+	err = s.WithTx(ctx, func(q *store.Queries) error {
+		_, err := q.InsertCluster(ctx, store.InsertClusterParams{
+			Name:          name,
+			ApiUrl:        "https://k",
+			OidcIssuerUrl: "http://localhost:5556",
+		})
+		if err != nil {
+			return err
+		}
+		return sentinel
+	})
+	require.ErrorIs(t, err, sentinel)
+
+	_, err = s.GetClusterByName(ctx, name)
+	require.Error(t, err, "cluster must not be committed after rollback")
 }
 
 func TestInsertClusterAndTemplate(t *testing.T) {
