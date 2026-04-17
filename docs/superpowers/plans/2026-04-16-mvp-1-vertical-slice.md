@@ -557,7 +557,7 @@ git commit -m "feat(backend): add atlas schema for users, clusters, templates, r
 
 Having `dex` locally means OIDC integration can be exercised by tests without calling Google/Keycloak.
 
-- [ ] **Step 1: Write the compose file**
+- [x] **Step 1: Write the compose file**
 
 Path: `deploy/docker/docker-compose.yml`
 ```yaml
@@ -590,6 +590,7 @@ storage:
   type: memory
 web:
   http: 0.0.0.0:5556
+enablePasswordDB: true
 staticClients:
   - id: kuberport
     redirectURIs:
@@ -603,7 +604,7 @@ staticPasswords:
     userID: "alice-000"
 ```
 
-- [ ] **Step 2: Bring up services and verify**
+- [x] **Step 2: Bring up services and verify**
 
 ```bash
 docker compose -f deploy/docker/docker-compose.yml up -d
@@ -611,14 +612,14 @@ curl -s http://localhost:5556/.well-known/openid-configuration | head
 ```
 Expected: dex returns JSON with `issuer: http://localhost:5556`.
 
-- [ ] **Step 3: Re-apply atlas schema against compose postgres**
+- [x] **Step 3: Re-apply atlas schema against compose postgres**
 
 ```bash
 cd backend && atlas schema apply --env local --auto-approve
 ```
 Expected: "No changes" (already applied).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add deploy/docker/
