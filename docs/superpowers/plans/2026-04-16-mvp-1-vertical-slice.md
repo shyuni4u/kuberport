@@ -148,7 +148,7 @@ The engineer implementing this should have available:
 - Create: `.gitignore`
 - Create: `README.md`
 
-- [ ] **Step 1: Check the current working directory and create root files**
+- [x] **Step 1: Check the current working directory and create root files**
 
 Run from `kuberport/`:
 ```bash
@@ -156,7 +156,7 @@ ls -la
 ```
 Expected: `CLAUDE.md`, `docs/` already present (from brainstorming). No `backend/`, `frontend/`, `deploy/` yet.
 
-- [ ] **Step 2: Create `.gitignore`**
+- [x] **Step 2: Create `.gitignore`**
 
 Path: `.gitignore`
 ```
@@ -192,7 +192,7 @@ frontend/out/
 *.pid
 ```
 
-- [ ] **Step 3: Create an initial `README.md`**
+- [x] **Step 3: Create an initial `README.md`**
 
 Path: `README.md`
 ```markdown
@@ -219,7 +219,7 @@ cd frontend && pnpm install && pnpm dev
 ```
 ```
 
-- [ ] **Step 4: Initialize git and commit**
+- [x] **Step 4: Initialize git and commit**
 
 ```bash
 git init
@@ -239,7 +239,7 @@ Expected: a single-file commit on the default branch.
 - Create: `backend/internal/api/routes.go`
 - Test: `backend/internal/api/routes_test.go`
 
-- [ ] **Step 1: Write the failing healthz test**
+- [x] **Step 1: Write the failing healthz test**
 
 Path: `backend/internal/api/routes_test.go`
 ```go
@@ -266,14 +266,14 @@ func TestHealthz(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test — expect it to fail**
+- [x] **Step 2: Run the test — expect it to fail**
 
 ```bash
 cd backend && go test ./internal/api/...
 ```
 Expected: FAIL (no module, no package).
 
-- [ ] **Step 3: Initialize Go module**
+- [x] **Step 3: Initialize Go module**
 
 ```bash
 cd backend
@@ -282,7 +282,7 @@ go get github.com/gin-gonic/gin@latest
 go get github.com/stretchr/testify@latest
 ```
 
-- [ ] **Step 4: Implement `config.Config` and `NewRouter`**
+- [x] **Step 4: Implement `config.Config` and `NewRouter`**
 
 Path: `backend/internal/config/config.go`
 ```go
@@ -352,14 +352,14 @@ func getenv(k, def string) string {
 }
 ```
 
-- [ ] **Step 5: Run the test — expect it to pass**
+- [x] **Step 5: Run the test — expect it to pass**
 
 ```bash
 cd backend && go test ./internal/api/...
 ```
 Expected: `PASS`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/
@@ -376,7 +376,7 @@ git commit -m "feat(backend): scaffold gin server with /healthz"
 
 This ships the full schema from spec §6.2 up front so later tasks only wire queries, not migrations.
 
-- [ ] **Step 1: Write `atlas.hcl` with `local` env pointing at docker-compose postgres**
+- [x] **Step 1: Write `atlas.hcl` with `local` env pointing at docker-compose postgres**
 
 Path: `backend/migrations/atlas.hcl`
 ```hcl
@@ -387,7 +387,7 @@ env "local" {
 }
 ```
 
-- [ ] **Step 2: Write `schema.hcl` covering all 6 tables**
+- [x] **Step 2: Write `schema.hcl` covering all 6 tables**
 
 Path: `backend/migrations/schema.hcl`
 ```hcl
@@ -518,7 +518,7 @@ table "sessions" {
 }
 ```
 
-- [ ] **Step 3: Start postgres via docker-compose (stub)**
+- [x] **Step 3: Start postgres via docker-compose (stub)**
 
 We will author `deploy/docker/docker-compose.yml` in Task 4. For now launch postgres directly to unblock schema apply:
 
@@ -528,7 +528,7 @@ docker run --rm -d --name kuberport-pg \
   -p 5432:5432 postgres:16
 ```
 
-- [ ] **Step 4: Apply schema and verify**
+- [x] **Step 4: Apply schema and verify**
 
 ```bash
 cd backend
@@ -541,7 +541,7 @@ docker exec -it kuberport-pg psql -U kuberport -c '\dt'
 ```
 Expected: table list includes `users`, `clusters`, `templates`, `template_versions`, `releases`, `sessions`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/migrations/
