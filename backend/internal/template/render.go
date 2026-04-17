@@ -18,6 +18,20 @@ type Labels struct {
 	AppliedBy       string
 }
 
+// ValidateSpec parses the resources and ui-spec YAML pair and returns a
+// non-nil error if either is malformed or if any ui-spec field has an
+// invalid pattern. It skips value injection and required-field checks so
+// admins can register templates whose fields are required at deploy time.
+func ValidateSpec(resourcesYAML, uiSpecYAML string) error {
+	if _, err := parseMultiDoc(resourcesYAML); err != nil {
+		return err
+	}
+	if _, err := parseSpec(uiSpecYAML); err != nil {
+		return err
+	}
+	return nil
+}
+
 func Render(resourcesYAML, uiSpecYAML string, values json.RawMessage, l Labels) ([]byte, error) {
 	docs, err := parseMultiDoc(resourcesYAML)
 	if err != nil {

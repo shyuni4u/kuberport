@@ -29,7 +29,7 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 		writeError(c, http.StatusBadRequest, "validation-error", err.Error())
 		return
 	}
-	if _, err := template.Render(r.ResourcesYAML, r.UISpecYAML, []byte("{}"), template.Labels{}); err != nil {
+	if err := template.ValidateSpec(r.ResourcesYAML, r.UISpecYAML); err != nil {
 		writeError(c, http.StatusBadRequest, "validation-error", err.Error())
 		return
 	}

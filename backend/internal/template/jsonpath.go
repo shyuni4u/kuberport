@@ -75,6 +75,9 @@ func setInto(node any, rest string, v any) error {
 				return nil
 			}
 			if _, exists := obj[m[1]]; !exists {
+				if strings.HasPrefix(rest, "[") {
+					return fmt.Errorf("cannot auto-create array at %q: add the field to the template", m[1])
+				}
 				obj[m[1]] = map[string]any{}
 			}
 			node = obj[m[1]]

@@ -100,6 +100,65 @@ func TestRender_IndexOutOfRangeReturnsError(t *testing.T) {
 	require.ErrorContains(t, err, "out of range")
 }
 
+func TestValidateSpec_AcceptsRequiredFieldsWithoutValues(t *testing.T) {
+	uiSpec := `fields:
+  - path: Deployment[web].spec.replicas
+    label: "Replicas"
+    type: integer
+    required: true
+`
+	require.NoError(t, template.ValidateSpec(resourcesYAML, uiSpec))
+}
+
+func TestValidateSpec_RejectsMalformedUISpec(t *testing.T) {
+	require.Error(t, template.ValidateSpec(resourcesYAML, "fields: [invalid"))
+}
+
+func TestRender_MissingIntermediateArrayFails(t *testing.T) {
+	uiSpec := `fields:
+  - path: Deployment[web].spec.annotations[0]
+    label: "Annotation"
+    type: string
+`
+	values, _ := json.Marshal(map[string]any{
+		"Deployment[web].spec.annotations[0]": "x",
+	})
+	_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+	require.ErrorContains(t, err, "cannot auto-create array")
+}
+
+func TestRender_BooleanType(t *testing.T) {
+	uiSpec := `fields:
+  - path: Deployment[web].spec.paused
+    label: "Paused"
+    type: boolean
+`
+	t.Run("bool ok", func(t *testing.T) {
+		values, _ := json.Marshal(map[string]any{
+			"Deployment[web].spec.paused": true,
+		})
+		_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+		require.NoError(t, err)
+	})
+	t.Run("string rejected", func(t *testing.T) {
+		values, _ := json.Marshal(map[string]any{
+			"Deployment[web].spec.paused": "yes",
+		})
+		_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+		require.ErrorContains(t, err, "not a boolean")
+	})
+}
+
+func TestParseSpec_RejectsInvalidPatternEagerly(t *testing.T) {
+	uiSpec := `fields:
+  - path: Deployment[web].metadata.name
+    label: "Name"
+    type: string
+    pattern: "["
+`
+	require.Error(t, template.ValidateSpec(resourcesYAML, uiSpec))
+}
+
 func TestRender_PatternValidation(t *testing.T) {
 	uiSpec := `fields:
   - path: Deployment[web].metadata.name

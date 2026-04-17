@@ -27,6 +27,8 @@ type Field struct {
 	Values   []string  `yaml:"values"`
 	Default  any       `yaml:"default"`
 	Required bool      `yaml:"required"`
+
+	patternRE *regexp.Regexp `yaml:"-"`
 }
 
 type UISpec struct {
@@ -37,6 +39,17 @@ func parseSpec(src string) (UISpec, error) {
 	var s UISpec
 	if err := yaml.Unmarshal([]byte(src), &s); err != nil {
 		return UISpec{}, fmt.Errorf("ui-spec unmarshal: %w", err)
+	}
+	for i := range s.Fields {
+		if s.Fields[i].Pattern == "" {
+			continue
+		}
+		re, err := regexp.Compile(s.Fields[i].Pattern)
+		if err != nil {
+			return UISpec{}, fmt.Errorf("field %q: invalid pattern %q: %w",
+				s.Fields[i].Label, s.Fields[i].Pattern, err)
+		}
+		s.Fields[i].patternRE = re
 	}
 	return s, nil
 }
@@ -55,19 +68,19 @@ func (f Field) Validate(v any) error {
 			return fmt.Errorf("%s: above max %d", f.Label, *f.Max)
 		}
 	case TypeString:
-		if f.Pattern == "" {
+		if f.patternRE == nil {
 			return nil
 		}
 		s, ok := v.(string)
 		if !ok {
 			return fmt.Errorf("%s: not a string", f.Label)
 		}
-		re, err := regexp.Compile(f.Pattern)
-		if err != nil {
-			return fmt.Errorf("%s: invalid pattern %q: %w", f.Label, f.Pattern, err)
-		}
-		if !re.MatchString(s) {
+		if !f.patternRE.MatchString(s) {
 			return fmt.Errorf("%s: does not match pattern %q", f.Label, f.Pattern)
+		}
+	case TypeBoolean:
+		if _, ok := v.(bool); !ok {
+			return fmt.Errorf("%s: not a boolean", f.Label)
 		}
 	case TypeEnum:
 		s := fmt.Sprint(v)
