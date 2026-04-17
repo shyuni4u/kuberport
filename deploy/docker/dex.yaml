@@ -3,6 +3,8 @@ storage:
   type: memory
 web:
   http: 0.0.0.0:5556
+oauth2:
+  passwordConnector: local
 enablePasswordDB: true
 staticClients:
   - id: kuberport
@@ -12,6 +14,6 @@ staticClients:
     secret: local-dev-secret
 staticPasswords:
   - email: alice@example.com
-    hash: "$2a$10$/Y8F7dK2rQ0ETK2uW2dO.OWjq8T7QwVxQoL5cqrWj7hHHOH0fLc2a"  # password: alice
+    hash: "$2a$10$vECrnrZp1stcCkukSTINn.2ijRZSS3RUnNnvP.gg0vUvS8IhNBL7S"  # password: alice (regenerated 2026-04-17)
     username: alice
     userID: "alice-000"

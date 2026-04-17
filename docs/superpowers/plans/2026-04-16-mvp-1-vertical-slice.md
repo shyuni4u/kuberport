@@ -590,6 +590,8 @@ storage:
   type: memory
 web:
   http: 0.0.0.0:5556
+oauth2:
+  passwordConnector: local   # needed for ROPC grant used by verifier_test.go
 enablePasswordDB: true
 staticClients:
   - id: kuberport
@@ -599,7 +601,9 @@ staticClients:
     secret: local-dev-secret
 staticPasswords:
   - email: alice@example.com
-    hash: "$2a$10$/Y8F7dK2rQ0ETK2uW2dO.OWjq8T7QwVxQoL5cqrWj7hHHOH0fLc2a"  # password: alice
+    # Regen with: go run 'golang.org/x/crypto/bcrypt' via a small `main.go`,
+    # or: docker run --rm httpd htpasswd -bnBC 10 "" <pw> | tr -d ':\n'
+    hash: "$2a$10$vECrnrZp1stcCkukSTINn.2ijRZSS3RUnNnvP.gg0vUvS8IhNBL7S"  # password: alice
     username: alice
     userID: "alice-000"
 ```
@@ -961,7 +965,7 @@ git commit -m "feat(backend): sqlc queries for clusters, templates, template_ver
 - Create: `backend/internal/auth/context.go`
 - Test: `backend/internal/auth/verifier_test.go`
 
-- [ ] **Step 1: Write the test using dex**
+- [x] **Step 1: Write the test using dex**
 
 Path: `backend/internal/auth/verifier_test.go`
 ```go
@@ -1013,14 +1017,14 @@ func TestVerifier_Verify(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test — expect it to fail**
+- [x] **Step 2: Run the test — expect it to fail**
 
 ```bash
 cd backend && go test ./internal/auth/...
 ```
 Expected: FAIL — `auth` package doesn't exist.
 
-- [ ] **Step 3: Add go-oidc dependency and implement verifier**
+- [x] **Step 3: Add go-oidc dependency and implement verifier**
 
 ```bash
 go get github.com/coreos/go-oidc/v3/oidc@latest
@@ -1091,14 +1095,14 @@ func UserFrom(ctx context.Context) (RequestUser, bool) {
 }
 ```
 
-- [ ] **Step 4: Run the test — expect it to pass**
+- [x] **Step 4: Run the test — expect it to pass**
 
 ```bash
 cd backend && go test ./internal/auth/...
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/internal/auth/
