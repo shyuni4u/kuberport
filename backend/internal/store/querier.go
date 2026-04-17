@@ -12,10 +12,26 @@ import (
 
 type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	DeleteRelease(ctx context.Context, id pgtype.UUID) error
 	DeleteSession(ctx context.Context, id pgtype.UUID) error
+	GetClusterByName(ctx context.Context, name string) (Cluster, error)
+	GetReleaseByID(ctx context.Context, id pgtype.UUID) (GetReleaseByIDRow, error)
 	GetSession(ctx context.Context, id pgtype.UUID) (Session, error)
+	GetTemplateByName(ctx context.Context, name string) (Template, error)
+	GetTemplateVersion(ctx context.Context, arg GetTemplateVersionParams) (TemplateVersion, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
+	InsertCluster(ctx context.Context, arg InsertClusterParams) (Cluster, error)
+	InsertRelease(ctx context.Context, arg InsertReleaseParams) (Release, error)
+	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
+	InsertTemplateVersion(ctx context.Context, arg InsertTemplateVersionParams) (TemplateVersion, error)
+	ListClusters(ctx context.Context) ([]Cluster, error)
+	ListReleasesForUser(ctx context.Context, createdByUserID pgtype.UUID) ([]ListReleasesForUserRow, error)
+	ListTemplateVersions(ctx context.Context, name string) ([]TemplateVersion, error)
+	ListTemplates(ctx context.Context) ([]ListTemplatesRow, error)
+	NextTemplateVersion(ctx context.Context, templateID pgtype.UUID) (int32, error)
+	PublishTemplateVersion(ctx context.Context, id pgtype.UUID) (TemplateVersion, error)
 	UpdateSessionTokens(ctx context.Context, arg UpdateSessionTokensParams) error
+	UpdateTemplateCurrentVersion(ctx context.Context, arg UpdateTemplateCurrentVersionParams) error
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }
 

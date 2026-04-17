@@ -804,7 +804,7 @@ git commit -m "feat(backend): sqlc queries for users and sessions"
 - Create: `backend/internal/store/queries/releases.sql`
 - Test: `backend/internal/store/store_test.go` (extend)
 
-- [ ] **Step 1: Write cluster queries**
+- [x] **Step 1: Write cluster queries**
 
 Path: `backend/internal/store/queries/clusters.sql`
 ```sql
@@ -819,7 +819,7 @@ INSERT INTO clusters (name, display_name, api_url, ca_bundle, oidc_issuer_url, d
 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 ```
 
-- [ ] **Step 2: Write template + template_version queries**
+- [x] **Step 2: Write template + template_version queries**
 
 Path: `backend/internal/store/queries/templates.sql`
 ```sql
@@ -867,7 +867,7 @@ SELECT tv.* FROM template_versions tv
  ORDER BY tv.version DESC;
 ```
 
-- [ ] **Step 3: Write release queries**
+- [x] **Step 3: Write release queries**
 
 Path: `backend/internal/store/queries/releases.sql`
 ```sql
@@ -897,14 +897,14 @@ VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 DELETE FROM releases WHERE id = $1;
 ```
 
-- [ ] **Step 4: Regenerate and compile**
+- [x] **Step 4: Regenerate and compile**
 
 ```bash
 cd backend && sqlc generate && go build ./...
 ```
 Expected: no errors.
 
-- [ ] **Step 5: Append test for one cluster+template flow**
+- [x] **Step 5: Append test for one cluster+template flow**
 
 Append to `backend/internal/store/store_test.go`:
 ```go
@@ -940,7 +940,7 @@ func TestInsertClusterAndTemplate(t *testing.T) {
 }
 ```
 
-- [ ] **Step 6: Run and commit**
+- [x] **Step 6: Run and commit**
 
 ```bash
 cd backend && go test ./internal/store/...
