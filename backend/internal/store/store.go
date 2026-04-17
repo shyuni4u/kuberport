@@ -16,6 +16,10 @@ func NewStore(ctx context.Context, dsn string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, err
+	}
 	return &Store{Queries: New(pool), pool: pool}, nil
 }
 

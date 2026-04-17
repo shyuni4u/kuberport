@@ -1,12 +1,16 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"kuberport/internal/store"
 )
+
+const pgUniqueViolation = "23505"
 
 type createClusterReq struct {
 	Name             string `json:"name"               binding:"required,min=1"`
@@ -22,6 +26,9 @@ func (h *Handlers) ListClusters(c *gin.Context) {
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
+	}
+	if cs == nil {
+		cs = []store.Cluster{}
 	}
 	c.JSON(http.StatusOK, gin.H{"clusters": cs})
 }
@@ -41,7 +48,12 @@ func (h *Handlers) CreateCluster(c *gin.Context) {
 		DefaultNamespace: store.PgText(r.DefaultNamespace),
 	})
 	if err != nil {
-		writeError(c, http.StatusConflict, "conflict", err.Error())
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			writeError(c, http.StatusConflict, "conflict", "cluster name already exists")
+			return
+		}
+		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 	c.JSON(http.StatusCreated, cl)

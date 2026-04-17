@@ -65,3 +65,24 @@ func TestClusters_Register_AdminSucceeds(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
 	require.NotEmpty(t, got["id"])
 }
+
+func TestClusters_Register_DuplicateReturns409(t *testing.T) {
+	r := api.NewRouter(config.Config{}, api.Deps{Verifier: adminVerifier{}, Store: testStore(t)})
+	name := "dup-" + randSuffix()
+	bodyStr := `{"name":"` + name + `","api_url":"https://k","oidc_issuer_url":"http://localhost:5556"}`
+
+	req1 := httptest.NewRequest(http.MethodPost, "/v1/clusters", bytes.NewReader([]byte(bodyStr)))
+	req1.Header.Set("Authorization", "Bearer x")
+	req1.Header.Set("Content-Type", "application/json")
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+	require.Equal(t, http.StatusCreated, w1.Code)
+
+	req2 := httptest.NewRequest(http.MethodPost, "/v1/clusters", bytes.NewReader([]byte(bodyStr)))
+	req2.Header.Set("Authorization", "Bearer x")
+	req2.Header.Set("Content-Type", "application/json")
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+	require.Equal(t, http.StatusConflict, w2.Code)
+	require.Contains(t, w2.Body.String(), "conflict")
+}
