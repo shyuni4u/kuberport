@@ -1895,7 +1895,7 @@ git commit -m "feat(backend): template render with JSONPath assignment and label
 - Test: `backend/internal/api/templates_test.go`
 - Modify: `backend/internal/api/routes.go`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Path: `backend/internal/api/templates_test.go`
 ```go
@@ -1943,7 +1943,7 @@ func TestTemplates_CreateAndPublish(t *testing.T) {
 
 `minimalResources` / `minimalUISpec` are the same strings used in the render test, moved to a shared `testdata_test.go`.
 
-- [ ] **Step 2: Implement handlers**
+- [x] **Step 2: Implement handlers**
 
 Path: `backend/internal/api/templates.go`
 ```go
@@ -2098,13 +2098,13 @@ v.GET("/templates/:name/versions/:v", h.GetTemplateVersion)
 v.POST("/templates/:name/versions/:v/publish", requireAdmin(), h.PublishVersion)
 ```
 
-- [ ] **Step 3: Run — expect PASS**
+- [x] **Step 3: Run — expect PASS**
 
 ```bash
 cd backend && go test ./internal/api/... -run Templates
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/internal/api/

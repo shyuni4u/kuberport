@@ -30,5 +30,11 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 	v.GET("/me", h.GetMe)
 	v.GET("/clusters", h.ListClusters)
 	v.POST("/clusters", requireAdmin(), h.CreateCluster)
+	v.GET("/templates", h.ListTemplates)
+	v.POST("/templates", requireAdmin(), h.CreateTemplate)
+	v.GET("/templates/:name", h.GetTemplate)
+	v.GET("/templates/:name/versions", h.ListTemplateVersions)
+	v.GET("/templates/:name/versions/:v", h.GetTemplateVersion)
+	v.POST("/templates/:name/versions/:v/publish", requireAdmin(), h.PublishVersion)
 	return r
 }
