@@ -1,0 +1,16 @@
+# schema.sql is derived from migrations/schema.hcl (atlas is source of truth).
+# Regenerate after editing schema.hcl:
+#   cd backend/migrations && atlas schema inspect --env local --format '{{ sql . }}' 2>/dev/null > schema.sql
+# (requires local compose postgres running — see deploy/docker/docker-compose.yml)
+version: "2"
+sql:
+  - engine: postgresql
+    schema: migrations/schema.sql
+    queries: internal/store/queries
+    gen:
+      go:
+        package: store
+        out: internal/store
+        sql_package: pgx/v5
+        emit_json_tags: true
+        emit_interface: true

@@ -632,19 +632,26 @@ git commit -m "chore: add docker-compose with postgres and dex for local dev"
 
 **Files:**
 - Create: `backend/sqlc.yaml`
+- Create: `backend/migrations/schema.sql` (derived from `schema.hcl` — sqlc can't parse HCL)
 - Create: `backend/internal/store/queries/users.sql`
 - Create: `backend/internal/store/queries/sessions.sql`
 - Create: `backend/internal/store/store.go`
 - Test: `backend/internal/store/store_test.go`
 
-- [ ] **Step 1: Write `sqlc.yaml`**
+- [x] **Step 1: Write `sqlc.yaml` and derive `schema.sql` from `schema.hcl`**
+
+sqlc doesn't understand Atlas HCL, so we keep `schema.hcl` as the source of truth for atlas migrations and commit a derived `schema.sql` that sqlc reads. Regen command:
+
+```bash
+cd backend/migrations && atlas schema inspect --env local --format '{{ sql . }}' 2>/dev/null > schema.sql
+```
 
 Path: `backend/sqlc.yaml`
 ```yaml
 version: "2"
 sql:
   - engine: postgresql
-    schema: migrations/schema.hcl
+    schema: migrations/schema.sql
     queries: internal/store/queries
     gen:
       go:
@@ -655,7 +662,7 @@ sql:
         emit_interface: true
 ```
 
-- [ ] **Step 2: Write user queries**
+- [x] **Step 2: Write user queries**
 
 Path: `backend/internal/store/queries/users.sql`
 ```sql
@@ -672,7 +679,7 @@ RETURNING *;
 SELECT * FROM users WHERE id = $1;
 ```
 
-- [ ] **Step 3: Write session queries**
+- [x] **Step 3: Write session queries**
 
 Path: `backend/internal/store/queries/sessions.sql`
 ```sql
@@ -693,14 +700,14 @@ UPDATE sessions
 DELETE FROM sessions WHERE id = $1;
 ```
 
-- [ ] **Step 4: Run sqlc**
+- [x] **Step 4: Run sqlc**
 
 ```bash
 cd backend && sqlc generate
 ```
 Expected: creates `internal/store/db.go`, `models.go`, `users.sql.go`, `sessions.sql.go`.
 
-- [ ] **Step 5: Write `store.Store` wrapper and its test**
+- [x] **Step 5: Write `store.Store` wrapper and its test**
 
 Path: `backend/internal/store/store.go`
 ```go
@@ -773,14 +780,14 @@ Helper (can live in the same test file):
 func pgText(s string) store.PgText { /* wraps pgtype.Text */ }
 ```
 
-- [ ] **Step 6: Run the test**
+- [x] **Step 6: Run the test**
 
 ```bash
 cd backend && go test ./internal/store/...
 ```
 Expected: PASS when local compose is up.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/sqlc.yaml backend/internal/store/
