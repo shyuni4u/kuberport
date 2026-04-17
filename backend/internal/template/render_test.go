@@ -86,3 +86,39 @@ func TestRender_ValidatesMin(t *testing.T) {
 	_, err := template.Render(resourcesYAML, uiSpecYAML, values, template.Labels{})
 	require.ErrorContains(t, err, "min")
 }
+
+func TestRender_IndexOutOfRangeReturnsError(t *testing.T) {
+	uiSpec := `fields:
+  - path: Deployment[web].spec.template.spec.containers[99].image
+    label: "Container Image"
+    type: string
+`
+	values, _ := json.Marshal(map[string]any{
+		"Deployment[web].spec.template.spec.containers[99].image": "x",
+	})
+	_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+	require.ErrorContains(t, err, "out of range")
+}
+
+func TestRender_PatternValidation(t *testing.T) {
+	uiSpec := `fields:
+  - path: Deployment[web].metadata.name
+    label: "Name"
+    type: string
+    pattern: "^[a-z][a-z0-9-]*$"
+`
+	t.Run("matching", func(t *testing.T) {
+		values, _ := json.Marshal(map[string]any{
+			"Deployment[web].metadata.name": "valid-name",
+		})
+		_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+		require.NoError(t, err)
+	})
+	t.Run("non-matching", func(t *testing.T) {
+		values, _ := json.Marshal(map[string]any{
+			"Deployment[web].metadata.name": "Invalid Name 123",
+		})
+		_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+		require.ErrorContains(t, err, "pattern")
+	})
+}

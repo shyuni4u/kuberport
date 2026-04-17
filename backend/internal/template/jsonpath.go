@@ -56,7 +56,7 @@ func findDoc(docs []map[string]any, kind, selector string) (map[string]any, erro
 	return nil, fmt.Errorf("no %s matching %q", kind, selector)
 }
 
-var segRE = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_]*)|\[(\d+)\]`)
+var segRE = regexp.MustCompile(`^(?:([A-Za-z_][A-Za-z0-9_]*)|\[(\d+)\])`)
 
 func setInto(node any, rest string, v any) error {
 	for rest != "" {
@@ -83,6 +83,9 @@ func setInto(node any, rest string, v any) error {
 			arr, ok := node.([]any)
 			if !ok {
 				return fmt.Errorf("not an array at [%d]", idx)
+			}
+			if idx < 0 || idx >= len(arr) {
+				return fmt.Errorf("index %d out of range (len=%d)", idx, len(arr))
 			}
 			if rest == "" {
 				arr[idx] = v

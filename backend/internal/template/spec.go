@@ -2,6 +2,7 @@ package template
 
 import (
 	"fmt"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -52,6 +53,21 @@ func (f Field) Validate(v any) error {
 		}
 		if f.Max != nil && n > *f.Max {
 			return fmt.Errorf("%s: above max %d", f.Label, *f.Max)
+		}
+	case TypeString:
+		if f.Pattern == "" {
+			return nil
+		}
+		s, ok := v.(string)
+		if !ok {
+			return fmt.Errorf("%s: not a string", f.Label)
+		}
+		re, err := regexp.Compile(f.Pattern)
+		if err != nil {
+			return fmt.Errorf("%s: invalid pattern %q: %w", f.Label, f.Pattern, err)
+		}
+		if !re.MatchString(s) {
+			return fmt.Errorf("%s: does not match pattern %q", f.Label, f.Pattern)
 		}
 	case TypeEnum:
 		s := fmt.Sprint(v)
