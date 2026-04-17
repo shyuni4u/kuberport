@@ -41,9 +41,11 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 | Frontend | YAML 에디터 | Monaco (`dynamic import`) |
 | Frontend | 폼 | React Hook Form + Zod |
 | Frontend | OIDC | `openid-client` + httpOnly 쿠키 |
-| Frontend | 배포 | Vercel |
+| Frontend | 배포 | k8s Pod (backend와 같은 Helm chart — 단일 Ingress path 라우팅). 근거: [ADR 0001](docs/decisions/0001-frontend-deployment-helm-over-vercel.md) |
 | 통신 | 패턴 | **BFF** — Browser → Next.js Route Handler → Go API → k8s API |
 | 레포 | 구성 | 단일 레포, `backend/` `frontend/` `deploy/` 분리 |
+| 운영 호스팅 | 인프라 | **Hetzner CAX21 (ARM) + k3s single-node**, cert-manager + Let's Encrypt, Cloudflare DNS. 이미지: `ghcr.io`, `linux/arm64`. 근거: [ADR 0002](docs/decisions/0002-production-hosting-hetzner-k3s.md) |
+| 운영 호스팅 | CI/CD | GitHub Actions (빌드·푸시) → 초기: ssh + `helm upgrade`. 장기: ArgoCD (GitOps, pull 기반) |
 
 **아키텍처 경계 원칙**
 - 비즈니스 로직은 Go 백엔드에만. Next.js Route Handler는 **"인증 쿠키 관리 + 얇은 프록시"** 역할만.
@@ -57,10 +59,35 @@ kuberport/
 ├── CLAUDE.md                              ← 이 파일 (세션 진입점)
 ├── docs/
 │   ├── brainstorming-summary.md           ← 브레인스토밍 결정 요약
+│   ├── dev-setup.md                       ← 개발 환경 설정 가이드
 │   ├── superpowers/
 │   │   └── specs/                         ← 디자인 스펙 (다음 단계에 생성)
 │   └── decisions/                         ← ADR (필요 시 생성)
 ```
+
+## 세션 시작 시: 개발 환경 먼저 확인
+
+이 프로젝트는 **여러 머신(집/회사, Windows/WSL2/macOS 혼용)** 을 오가며 작업한다.
+새 세션을 시작할 때 경로·툴 상태가 머신마다 달라 빌드가 중간에 막히는 문제가 반복되므로,
+**코드 작성이나 빌드·설치 명령 실행 전에 다음을 먼저 확인**한다:
+
+1. **현재 위치** (`pwd`): WSL 홈(`~/dev/...`) 또는 macOS/Linux 홈 아래, ASCII·OneDrive 밖 경로인가.
+   `/mnt/c/...` · 한글·공백 포함 경로라면 먼저 [docs/dev-setup.md](docs/dev-setup.md) §2 를 읽고 이동.
+2. **필수 툴 존재 확인**: [docs/dev-setup.md](docs/dev-setup.md) §4 검증 커맨드 —
+   `go version` / `node -v` / `pnpm -v` / `atlas version` / `docker --version` / `kubectl version --client`
+   중 빠진 게 있으면 §2(Windows) 또는 §3(macOS/Linux) 설치 절차.
+3. **증상 기반 디버깅**: `EBUSY` / "file is being used by another process" / 비정상적으로 느린 IO / `command not found`
+   → [docs/dev-setup.md](docs/dev-setup.md) §1 (증상→원인 표) 부터 참조.
+
+새 머신에서 처음 클론했거나 위 확인이 실패하면 → [docs/dev-setup.md](docs/dev-setup.md) 전체.
+
+**Windows 사용자 핵심 요점 (시간 없으면 이것만)**:
+1. 리포를 **OneDrive 밖 + ASCII 경로**로 옮긴다 (예: `C:\dev\kuberport`). OneDrive 동기화 + 한글 경로는 `go build` / `pnpm install` 잠금 오류의 주원인.
+2. **WSL2 + Ubuntu** 에 코드를 두고 (`~/dev/kuberport`), Docker Desktop 의 WSL Integration 을 켜고, VS Code 는 **Remote-WSL** 로 연다.
+3. `/mnt/c/...` 경로에 코드를 두지 않는다 — IO 가 5~20배 느리다.
+4. 툴(`go`, `node`, `pnpm`, `atlas`, `kubectl`, `docker`)은 **WSL 쪽**에 설치. Windows 쪽 설치와 섞이면 PATH 충돌.
+
+macOS/Linux 는 그냥 Homebrew/apt 로 설치. 자세한 단계·검증 커맨드·함정 체크리스트는 `docs/dev-setup.md` 참조.
 
 ## 작업 시 규칙
 
@@ -68,6 +95,32 @@ kuberport/
 - **새 디자인 스펙**: `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` 경로로 작성.
 - **새 결정이 나오면**: `docs/brainstorming-summary.md`를 먼저 업데이트. 큰 결정은 `docs/decisions/`에 ADR 추가.
 - **브레인스토밍 재개 시**: 이 파일과 `docs/brainstorming-summary.md`를 먼저 읽고 시작.
+- **지속성은 docs 우선, memory 는 보조**: Claude auto-memory 는 머신·프로파일에 묶여
+  다른 기기에서 세션을 재개하면 **로드되지 않는다**. 프로젝트 결정·컨텍스트·후속 세션에서
+  재사용되어야 할 내용은 반드시 `docs/` 아래(ADR, `brainstorming-summary.md`, specs,
+  `dev-setup.md` 등)에 남기고 — 큰 결정은 `docs/decisions/` 에 ADR 로. memory 에는 개인
+  선호·세션 로컬 힌트 정도만 저장.
+
+## 테스트
+
+**TDD**: 플랜의 각 태스크는 "실패 테스트 → 구현 → 통과" 순. 상세는 [docs/testing.md](docs/testing.md).
+
+**레이어**:
+- **Unit** (외부 의존 없음) — 예: `TestHealthz`
+- **Integration** (로컬 compose: postgres + dex) — 현재 기본. 예: `internal/store/*_test.go`
+- **e2e** — Task 22 에서 도입
+
+**기본 커맨드** (컴포즈 기동 상태 가정):
+```bash
+docker compose -f deploy/docker/docker-compose.yml up -d
+cd backend && go test ./...
+```
+
+**환경 변수**: `TEST_DATABASE_URL` 미지정 시 `postgres://kuberport:kuberport@localhost:5432/kuberport?sslmode=disable` 기본값.
+
+**관례**:
+- 통합 테스트의 유니크 키는 `time.Now().Format("150405.000000")` (마이크로초 포함 — 초 단위는 재실행 시 충돌).
+- 통합 테스트에서 `t.Skip` 경로는 아직 미구현 — 컴포즈 없이는 실패함 ([docs/testing.md §6](docs/testing.md) TODO).
 
 ## 용어 (한국어 문서 기준)
 

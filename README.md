@@ -1,5 +1,7 @@
 # kuberport
 
+**English** | [한국어](README.ko.md)
+
 > Template-driven self-service portal for Kubernetes.
 > Admins publish YAML + ui-spec templates; non-experts deploy and operate via abstracted forms.
 
@@ -54,14 +56,14 @@ A **release** is one deployment of a template version into a specific cluster + 
 ## Architecture at a glance
 
 ```
-Browser ── Next.js (Vercel, BFF) ── Go API (in k8s) ── Target k8s clusters (N)
+Browser ── Next.js (k8s Pod, BFF) ── Go API (in k8s) ── Target k8s clusters (N)
               │                         │
               ▼                         ▼
           Postgres                  (user OIDC token forwarded as-is;
        (sessions + meta)             k8s RBAC is the final authority)
 ```
 
-- **Frontend**: Next.js 15 (App Router), Tailwind + shadcn/ui, Monaco for YAML, React Hook Form + Zod for dynamic forms.
+- **Frontend**: Next.js 15 (App Router), Tailwind + shadcn/ui, Monaco for YAML, React Hook Form + Zod for dynamic forms. Shipped as a k8s `Deployment` alongside the Go API in the same Helm chart — one `helm install` boots the whole stack.
 - **Backend**: Go 1.22, Gin, `client-go`, `sqlc`, `atlas`, `coreos/go-oidc`.
 - **Data**: PostgreSQL 16 in prod (SQLite for dev); OIDC + httpOnly cookie session, refresh tokens encrypted at rest.
 - **Security model**: the app is a UX layer. Every k8s write is performed with the signed-in user's OIDC id_token, so Kubernetes RBAC decides what actually happens.
@@ -132,4 +134,4 @@ Not yet open to outside contributions — the shape of the system is still stabi
 
 ## License
 
-To be decided before the first public push. Likely Apache-2.0.
+[MIT License](LICENSE) — free to use, modify, and redistribute, provided the copyright notice and license text are preserved.

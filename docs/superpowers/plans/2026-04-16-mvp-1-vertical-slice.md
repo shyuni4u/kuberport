@@ -4,7 +4,7 @@
 
 **Goal:** Ship the thinnest end-to-end slice of `kuberport`: an admin can log in, register a cluster, author a template in **YAML mode only**, publish v1, a user can then deploy that template via a generated form and see the deployed release's summary status.
 
-**Architecture:** Go API (Gin + client-go + sqlc + atlas) talking to Postgres and multiple target k8s clusters, fronted by a Next.js 15 app on Vercel that handles OIDC via `openid-client` and proxies `/api/v1/*` to Go with `Authorization: Bearer <id_token>` injected from a server-side session. Every k8s write uses the user's own token so k8s RBAC is the security source of truth.
+**Architecture:** Go API (Gin + client-go + sqlc + atlas) talking to Postgres and multiple target k8s clusters, fronted by a Next.js 15 app running as a k8s `Deployment` in the same Helm chart as the Go API (see ADR 0001). The Next.js app handles OIDC via `openid-client` and proxies `/api/v1/*` to Go with `Authorization: Bearer <id_token>` injected from a server-side session. Every k8s write uses the user's own token so k8s RBAC is the security source of truth.
 
 **Tech Stack:** Go 1.22, Gin, client-go, sqlc, atlas, pgx, coreos/go-oidc, Next.js 15 (App Router), React 18, TypeScript, Tailwind, shadcn/ui, Monaco Editor, React Hook Form, Zod, `openid-client`, `iron-session`, PostgreSQL 16, Docker.
 
@@ -148,7 +148,7 @@ The engineer implementing this should have available:
 - Create: `.gitignore`
 - Create: `README.md`
 
-- [ ] **Step 1: Check the current working directory and create root files**
+- [x] **Step 1: Check the current working directory and create root files**
 
 Run from `kuberport/`:
 ```bash
@@ -156,7 +156,7 @@ ls -la
 ```
 Expected: `CLAUDE.md`, `docs/` already present (from brainstorming). No `backend/`, `frontend/`, `deploy/` yet.
 
-- [ ] **Step 2: Create `.gitignore`**
+- [x] **Step 2: Create `.gitignore`**
 
 Path: `.gitignore`
 ```
@@ -187,13 +187,12 @@ backend/vendor/
 frontend/node_modules/
 frontend/.next/
 frontend/out/
-frontend/.vercel/
 
 # Docker
 *.pid
 ```
 
-- [ ] **Step 3: Create an initial `README.md`**
+- [x] **Step 3: Create an initial `README.md`**
 
 Path: `README.md`
 ```markdown
@@ -220,7 +219,7 @@ cd frontend && pnpm install && pnpm dev
 ```
 ```
 
-- [ ] **Step 4: Initialize git and commit**
+- [x] **Step 4: Initialize git and commit**
 
 ```bash
 git init
@@ -240,7 +239,7 @@ Expected: a single-file commit on the default branch.
 - Create: `backend/internal/api/routes.go`
 - Test: `backend/internal/api/routes_test.go`
 
-- [ ] **Step 1: Write the failing healthz test**
+- [x] **Step 1: Write the failing healthz test**
 
 Path: `backend/internal/api/routes_test.go`
 ```go
@@ -267,14 +266,14 @@ func TestHealthz(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test — expect it to fail**
+- [x] **Step 2: Run the test — expect it to fail**
 
 ```bash
 cd backend && go test ./internal/api/...
 ```
 Expected: FAIL (no module, no package).
 
-- [ ] **Step 3: Initialize Go module**
+- [x] **Step 3: Initialize Go module**
 
 ```bash
 cd backend
@@ -283,7 +282,7 @@ go get github.com/gin-gonic/gin@latest
 go get github.com/stretchr/testify@latest
 ```
 
-- [ ] **Step 4: Implement `config.Config` and `NewRouter`**
+- [x] **Step 4: Implement `config.Config` and `NewRouter`**
 
 Path: `backend/internal/config/config.go`
 ```go
@@ -353,14 +352,14 @@ func getenv(k, def string) string {
 }
 ```
 
-- [ ] **Step 5: Run the test — expect it to pass**
+- [x] **Step 5: Run the test — expect it to pass**
 
 ```bash
 cd backend && go test ./internal/api/...
 ```
 Expected: `PASS`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/
@@ -377,7 +376,7 @@ git commit -m "feat(backend): scaffold gin server with /healthz"
 
 This ships the full schema from spec §6.2 up front so later tasks only wire queries, not migrations.
 
-- [ ] **Step 1: Write `atlas.hcl` with `local` env pointing at docker-compose postgres**
+- [x] **Step 1: Write `atlas.hcl` with `local` env pointing at docker-compose postgres**
 
 Path: `backend/migrations/atlas.hcl`
 ```hcl
@@ -388,7 +387,7 @@ env "local" {
 }
 ```
 
-- [ ] **Step 2: Write `schema.hcl` covering all 6 tables**
+- [x] **Step 2: Write `schema.hcl` covering all 6 tables**
 
 Path: `backend/migrations/schema.hcl`
 ```hcl
@@ -519,7 +518,7 @@ table "sessions" {
 }
 ```
 
-- [ ] **Step 3: Start postgres via docker-compose (stub)**
+- [x] **Step 3: Start postgres via docker-compose (stub)**
 
 We will author `deploy/docker/docker-compose.yml` in Task 4. For now launch postgres directly to unblock schema apply:
 
@@ -529,7 +528,7 @@ docker run --rm -d --name kuberport-pg \
   -p 5432:5432 postgres:16
 ```
 
-- [ ] **Step 4: Apply schema and verify**
+- [x] **Step 4: Apply schema and verify**
 
 ```bash
 cd backend
@@ -542,7 +541,7 @@ docker exec -it kuberport-pg psql -U kuberport -c '\dt'
 ```
 Expected: table list includes `users`, `clusters`, `templates`, `template_versions`, `releases`, `sessions`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/migrations/
@@ -558,7 +557,7 @@ git commit -m "feat(backend): add atlas schema for users, clusters, templates, r
 
 Having `dex` locally means OIDC integration can be exercised by tests without calling Google/Keycloak.
 
-- [ ] **Step 1: Write the compose file**
+- [x] **Step 1: Write the compose file**
 
 Path: `deploy/docker/docker-compose.yml`
 ```yaml
@@ -591,6 +590,9 @@ storage:
   type: memory
 web:
   http: 0.0.0.0:5556
+oauth2:
+  passwordConnector: local   # needed for ROPC grant used by verifier_test.go
+enablePasswordDB: true
 staticClients:
   - id: kuberport
     redirectURIs:
@@ -599,12 +601,14 @@ staticClients:
     secret: local-dev-secret
 staticPasswords:
   - email: alice@example.com
-    hash: "$2a$10$/Y8F7dK2rQ0ETK2uW2dO.OWjq8T7QwVxQoL5cqrWj7hHHOH0fLc2a"  # password: alice
+    # Regen with: go run 'golang.org/x/crypto/bcrypt' via a small `main.go`,
+    # or: docker run --rm httpd htpasswd -bnBC 10 "" <pw> | tr -d ':\n'
+    hash: "$2a$10$vECrnrZp1stcCkukSTINn.2ijRZSS3RUnNnvP.gg0vUvS8IhNBL7S"  # password: alice
     username: alice
     userID: "alice-000"
 ```
 
-- [ ] **Step 2: Bring up services and verify**
+- [x] **Step 2: Bring up services and verify**
 
 ```bash
 docker compose -f deploy/docker/docker-compose.yml up -d
@@ -612,14 +616,14 @@ curl -s http://localhost:5556/.well-known/openid-configuration | head
 ```
 Expected: dex returns JSON with `issuer: http://localhost:5556`.
 
-- [ ] **Step 3: Re-apply atlas schema against compose postgres**
+- [x] **Step 3: Re-apply atlas schema against compose postgres**
 
 ```bash
 cd backend && atlas schema apply --env local --auto-approve
 ```
 Expected: "No changes" (already applied).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add deploy/docker/
@@ -632,19 +636,26 @@ git commit -m "chore: add docker-compose with postgres and dex for local dev"
 
 **Files:**
 - Create: `backend/sqlc.yaml`
+- Create: `backend/migrations/schema.sql` (derived from `schema.hcl` — sqlc can't parse HCL)
 - Create: `backend/internal/store/queries/users.sql`
 - Create: `backend/internal/store/queries/sessions.sql`
 - Create: `backend/internal/store/store.go`
 - Test: `backend/internal/store/store_test.go`
 
-- [ ] **Step 1: Write `sqlc.yaml`**
+- [x] **Step 1: Write `sqlc.yaml` and derive `schema.sql` from `schema.hcl`**
+
+sqlc doesn't understand Atlas HCL, so we keep `schema.hcl` as the source of truth for atlas migrations and commit a derived `schema.sql` that sqlc reads. Regen command:
+
+```bash
+cd backend/migrations && atlas schema inspect --env local --format '{{ sql . }}' 2>/dev/null > schema.sql
+```
 
 Path: `backend/sqlc.yaml`
 ```yaml
 version: "2"
 sql:
   - engine: postgresql
-    schema: migrations/schema.hcl
+    schema: migrations/schema.sql
     queries: internal/store/queries
     gen:
       go:
@@ -655,7 +666,7 @@ sql:
         emit_interface: true
 ```
 
-- [ ] **Step 2: Write user queries**
+- [x] **Step 2: Write user queries**
 
 Path: `backend/internal/store/queries/users.sql`
 ```sql
@@ -672,7 +683,7 @@ RETURNING *;
 SELECT * FROM users WHERE id = $1;
 ```
 
-- [ ] **Step 3: Write session queries**
+- [x] **Step 3: Write session queries**
 
 Path: `backend/internal/store/queries/sessions.sql`
 ```sql
@@ -693,14 +704,14 @@ UPDATE sessions
 DELETE FROM sessions WHERE id = $1;
 ```
 
-- [ ] **Step 4: Run sqlc**
+- [x] **Step 4: Run sqlc**
 
 ```bash
 cd backend && sqlc generate
 ```
 Expected: creates `internal/store/db.go`, `models.go`, `users.sql.go`, `sessions.sql.go`.
 
-- [ ] **Step 5: Write `store.Store` wrapper and its test**
+- [x] **Step 5: Write `store.Store` wrapper and its test**
 
 Path: `backend/internal/store/store.go`
 ```go
@@ -773,14 +784,14 @@ Helper (can live in the same test file):
 func pgText(s string) store.PgText { /* wraps pgtype.Text */ }
 ```
 
-- [ ] **Step 6: Run the test**
+- [x] **Step 6: Run the test**
 
 ```bash
 cd backend && go test ./internal/store/...
 ```
 Expected: PASS when local compose is up.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/sqlc.yaml backend/internal/store/
@@ -797,7 +808,7 @@ git commit -m "feat(backend): sqlc queries for users and sessions"
 - Create: `backend/internal/store/queries/releases.sql`
 - Test: `backend/internal/store/store_test.go` (extend)
 
-- [ ] **Step 1: Write cluster queries**
+- [x] **Step 1: Write cluster queries**
 
 Path: `backend/internal/store/queries/clusters.sql`
 ```sql
@@ -812,7 +823,7 @@ INSERT INTO clusters (name, display_name, api_url, ca_bundle, oidc_issuer_url, d
 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
 ```
 
-- [ ] **Step 2: Write template + template_version queries**
+- [x] **Step 2: Write template + template_version queries**
 
 Path: `backend/internal/store/queries/templates.sql`
 ```sql
@@ -860,7 +871,7 @@ SELECT tv.* FROM template_versions tv
  ORDER BY tv.version DESC;
 ```
 
-- [ ] **Step 3: Write release queries**
+- [x] **Step 3: Write release queries**
 
 Path: `backend/internal/store/queries/releases.sql`
 ```sql
@@ -890,14 +901,14 @@ VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 DELETE FROM releases WHERE id = $1;
 ```
 
-- [ ] **Step 4: Regenerate and compile**
+- [x] **Step 4: Regenerate and compile**
 
 ```bash
 cd backend && sqlc generate && go build ./...
 ```
 Expected: no errors.
 
-- [ ] **Step 5: Append test for one cluster+template flow**
+- [x] **Step 5: Append test for one cluster+template flow**
 
 Append to `backend/internal/store/store_test.go`:
 ```go
@@ -933,7 +944,7 @@ func TestInsertClusterAndTemplate(t *testing.T) {
 }
 ```
 
-- [ ] **Step 6: Run and commit**
+- [x] **Step 6: Run and commit**
 
 ```bash
 cd backend && go test ./internal/store/...
@@ -954,7 +965,7 @@ git commit -m "feat(backend): sqlc queries for clusters, templates, template_ver
 - Create: `backend/internal/auth/context.go`
 - Test: `backend/internal/auth/verifier_test.go`
 
-- [ ] **Step 1: Write the test using dex**
+- [x] **Step 1: Write the test using dex**
 
 Path: `backend/internal/auth/verifier_test.go`
 ```go
@@ -1006,14 +1017,14 @@ func TestVerifier_Verify(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the test — expect it to fail**
+- [x] **Step 2: Run the test — expect it to fail**
 
 ```bash
 cd backend && go test ./internal/auth/...
 ```
 Expected: FAIL — `auth` package doesn't exist.
 
-- [ ] **Step 3: Add go-oidc dependency and implement verifier**
+- [x] **Step 3: Add go-oidc dependency and implement verifier**
 
 ```bash
 go get github.com/coreos/go-oidc/v3/oidc@latest
@@ -1084,14 +1095,14 @@ func UserFrom(ctx context.Context) (RequestUser, bool) {
 }
 ```
 
-- [ ] **Step 4: Run the test — expect it to pass**
+- [x] **Step 4: Run the test — expect it to pass**
 
 ```bash
 cd backend && go test ./internal/auth/...
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/internal/auth/
@@ -1109,7 +1120,7 @@ git commit -m "feat(backend): OIDC verifier with request-scoped user context"
 - Create: `backend/internal/api/me.go`
 - Test: `backend/internal/api/middleware_test.go`
 
-- [ ] **Step 1: Write the middleware test**
+- [x] **Step 1: Write the middleware test**
 
 Path: `backend/internal/api/middleware_test.go`
 ```go
@@ -1154,14 +1165,14 @@ func TestAuthMiddleware_Accepts_Bearer(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run — expect failure**
+- [x] **Step 2: Run — expect failure**
 
 ```bash
 cd backend && go test ./internal/api/...
 ```
 Expected: FAIL — `api.Deps` not defined, `/v1/me` not routed.
 
-- [ ] **Step 3: Implement errors.go**
+- [x] **Step 3: Implement errors.go**
 
 Path: `backend/internal/api/errors.go`
 ```go
@@ -1187,7 +1198,7 @@ func writeError(c *gin.Context, status int, kind, detail string) {
 }
 ```
 
-- [ ] **Step 4: Implement middleware.go**
+- [x] **Step 4: Implement middleware.go**
 
 Path: `backend/internal/api/middleware.go`
 ```go
@@ -1240,7 +1251,7 @@ func requireAdmin() gin.HandlerFunc {
 }
 ```
 
-- [ ] **Step 5: Implement me.go and update routes.go**
+- [x] **Step 5: Implement me.go and update routes.go**
 
 Path: `backend/internal/api/me.go`
 ```go
@@ -1297,13 +1308,13 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 }
 ```
 
-- [ ] **Step 6: Run — expect PASS**
+- [x] **Step 6: Run — expect PASS**
 
 ```bash
 cd backend && go test ./internal/api/...
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/internal/api/
@@ -1319,7 +1330,7 @@ git commit -m "feat(backend): auth middleware with RFC 7807 errors and /v1/me"
 - Test: `backend/internal/api/clusters_test.go`
 - Modify: `backend/internal/api/routes.go`
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Path: `backend/internal/api/clusters_test.go`
 ```go
@@ -1375,7 +1386,7 @@ func TestClusters_Register_AdminSucceeds(t *testing.T) {
 
 Add `testStore(t)` helper that returns a live `*store.Store` from the env DSN, and `randSuffix()` returns a short time-based slug.
 
-- [ ] **Step 2: Implement the handler**
+- [x] **Step 2: Implement the handler**
 
 Path: `backend/internal/api/clusters.go`
 ```go
@@ -1437,13 +1448,13 @@ v.POST("/clusters", requireAdmin(), h.CreateCluster)
 
 Add `Store *store.Store` to `Deps` and `pgText` helper.
 
-- [ ] **Step 3: Run — expect PASS**
+- [x] **Step 3: Run — expect PASS**
 
 ```bash
 cd backend && go test ./internal/api/... -run Clusters
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/internal/api/
@@ -2681,14 +2692,27 @@ export default function Home() {
 }
 ```
 
-- [ ] **Step 5: Smoke build**
+- [ ] **Step 5: Enable standalone output for future Helm chart packaging**
+
+Edit `frontend/next.config.ts` (or `.js` if present) to include:
+
+```ts
+const nextConfig = {
+  output: 'standalone',
+};
+export default nextConfig;
+```
+
+Rationale: per [ADR 0001](../../decisions/0001-frontend-deployment-helm-over-vercel.md) the frontend ships inside the same Helm chart as the Go API. `standalone` builds produce a self-contained Node server at `.next/standalone/` that a minimal Dockerfile (deferred to a later plan) can COPY directly. Setting this now avoids a reconfigure churn later.
+
+- [ ] **Step 6: Smoke build**
 
 ```bash
 pnpm build
 ```
-Expected: success, no TS errors.
+Expected: success, no TS errors. Verify that `frontend/.next/standalone/server.js` exists after the build.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add frontend/
@@ -3982,5 +4006,6 @@ git commit -m "docs: fill in README with setup and test commands"
 - Release settings tab
 - Release update-available notifications + migration flow
 - Release update (PUT /v1/releases/:id re-apply)
-- Helm chart for deploying `kuberport` itself
-- Production Dockerfile hardening
+- Helm chart for deploying `kuberport` itself (backend `Deployment` + frontend `Deployment` + single `Ingress` with path routing per ADR 0001)
+- Frontend production Dockerfile (multi-stage, copy `.next/standalone` into `node:*-alpine`) + image publish pipeline
+- Backend production Dockerfile hardening

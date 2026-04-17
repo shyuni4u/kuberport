@@ -123,7 +123,7 @@
 
 5개 컴포넌트 구성:
 - **Browser** — Next.js SPA, 사용자 인터페이스
-- **Next.js (BFF)** — Vercel에 배포, 인증 콜백 처리 + Go 백엔드 프록시
+- **Next.js (BFF)** — k8s Pod로 배포 (backend와 동일 Helm chart), 인증 콜백 처리 + Go 백엔드 프록시
 - **API Server (Go)** — k8s control 클러스터에 Pod로 배포, client-go 사용
 - **App DB (Postgres/SQLite)** — 템플릿 + 릴리스 메타 + 클러스터 등록
 - **OIDC Provider** — 외부 (Google/Keycloak/...)
@@ -158,17 +158,17 @@
 
 | 영역 | 결정 | 이유 |
 |------|------|------|
-| 프레임워크 | **Next.js 15 (App Router)** | Vercel 네이티브, OIDC 콜백 서버 처리, 미들웨어 auth guard |
+| 프레임워크 | **Next.js 15 (App Router)** | Route Handler 로 BFF 구현, 미들웨어 auth guard, `output: 'standalone'` 로 컨테이너화 용이 |
 | 스타일 | Tailwind + shadcn/ui | 빠른 레이아웃 + 접근성 좋은 컴포넌트 |
 | YAML 에디터 | Monaco Editor | VSCode와 같은 엔진, `dynamic import`로 SSR 우회 |
 | 폼 라이브러리 | React Hook Form + Zod | ui-spec → 동적 폼 생성에 적합 |
 | OIDC | `openid-client` | Node 환경 표준 OIDC 클라이언트 |
-| 배포 | Vercel | Next.js 네이티브 플랫폼 |
+| 배포 | k8s Pod (backend와 같은 Helm chart) | self-hosted 통합 설치 우선. 단일 Ingress 에서 `/api/*` ↔ `/*` path 라우팅. 상세 근거는 [ADR 0001](decisions/0001-frontend-deployment-helm-over-vercel.md) |
 
 **Vite 대신 Next.js를 선택한 이유**:
 1. OIDC 콜백을 Next.js Route Handler에서 서버 사이드 처리 → 토큰을 **httpOnly 쿠키**에 저장 → XSS 내성 (이 앱은 k8s 자격증명을 다루므로 보안 차이가 크다)
-2. `middleware.ts`로 인증 가드를 엣지 레벨에서 처리 → 페이지 깜빡임 없음
-3. Vercel + Next.js = zero-config / Vercel + Vite = 그냥 "정적 사이트"
+2. `middleware.ts`로 인증 가드를 엣지/서버 레벨에서 처리 → 페이지 깜빡임 없음
+3. `output: 'standalone'` 로 self-contained Node 이미지가 나와 backend와 같은 Helm chart 에 담기 쉬움 — Vite SPA 는 정적 호스팅 컨테이너가 별도로 필요
 4. BFF 패턴(Route Handler 프록시)으로 CORS 설정 제거
 
 ### 통신 패턴: BFF (Backend-for-Frontend)
@@ -180,8 +180,7 @@ Browser  ─→  Next.js Route Handler  ─→  Go API  ─→  k8s API
 
 **A (BFF)를 B (직접 호출)보다 선택한 이유**:
 - 토큰이 브라우저 JS에 아예 노출 안 됨 (진짜 httpOnly)
-- CORS 설정 0
-- 내부 툴이라 트래픽 작아 Vercel 함수 invocation 비용 무시 가능
+- CORS 설정 0 (단일 origin, Ingress 내부 path 라우팅)
 - 한 곳에서 요청 감시/로깅 가능
 
 **아키텍처 경계 원칙**: 비즈니스 로직은 Go 백엔드에만. Next.js Route Handler는 **인증 쿠키 관리 + 얇은 프록시** 역할만. 개발자가 Next.js API에 로직을 스며들게 하는 유혹이 있어 CLAUDE.md에 명시.
@@ -197,9 +196,43 @@ kuberport/
 ```
 Turborepo/nx 같은 모노레포 도구는 MVP에 과함 — 단순 디렉터리 분리로 시작.
 
+## 11. 운영 호스팅: Hetzner Cloud + k3s 단일 노드
+
+상세 근거와 대안 비교는 [ADR 0002](decisions/0002-production-hosting-hetzner-k3s.md).
+
+| 레이어 | 선택 |
+|--------|------|
+| VM | Hetzner CAX21 (ARM, 4 vCPU / 8GB / 80GB SSD, €7/월) |
+| k8s | k3s single-node (Traefik Ingress 내장) |
+| TLS | cert-manager + Let's Encrypt |
+| DNS | Cloudflare (무료) |
+| 이미지 레지스트리 | GitHub Container Registry (`ghcr.io`) |
+| 이미지 아키텍처 | `linux/arm64` (+ `linux/amd64` 선택, `docker buildx`) |
+| CI | GitHub Actions |
+| CD (초기) | GitHub Actions → ssh → `helm upgrade` |
+| CD (장기) | ArgoCD (k3s 내부 pull 기반 GitOps) |
+
+**예상 월 고정비: 약 €8 (~₩11,000)**
+
+**배제한 대안**
+- Oracle Cloud Always Free — 사용 불가
+- GCP $300 + GKE Autopilot — 90일 후 $40~70/월, 장기 운영 비경제
+- Civo / DigitalOcean Managed K8s — 크레딧 소진 후 ~$25/월, Hetzner 대비 3~4배
+
+**주요 리스크와 완화**
+- 단일 노드 SPOF → Hetzner 스냅샷 + `pg_dump` 외부 백업. 성장 시 2노드 k3s HA로 확장.
+- ARM 이미지 호환성 → `docker buildx` 멀티아키 빌드, 서드파티 이미지는 `docker manifest inspect` 확인.
+
+**Helm chart 설계 시 기억할 k3s 특수성**
+- Ingress class = `traefik`
+- `LoadBalancer` 서비스는 `servicelb` 로 호스트 포트(80/443) 점유
+- 기본 StorageClass = `local-path` (노드 로컬 디스크)
+- 외부 MetalLB/cloud LB 컨트롤러 없음 (단일 노드 전제)
+
 ## 미해결 (다음 브레인스토밍 토픽)
 
 1. UI 목업 — 템플릿 해부도 / 관리자 템플릿 편집기(YAML/UI 토글) / 사용자 카탈로그 / 배포 폼 / 릴리스 상세
 2. 데이터 모델 상세 — Template, Release, Cluster, User 테이블 스키마 + 관계
 3. API 디자인 개요 — 주요 엔드포인트
 4. 디자인 스펙 문서 작성 — `docs/superpowers/specs/YYYY-MM-DD-initial-design.md`
+5. **OIDC IdP 선택** — Google OAuth vs 자가호스팅 Keycloak (ADR 예정)

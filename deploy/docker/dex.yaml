@@ -1,0 +1,19 @@
+issuer: http://localhost:5556
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5556
+oauth2:
+  passwordConnector: local
+enablePasswordDB: true
+staticClients:
+  - id: kuberport
+    redirectURIs:
+      - http://localhost:3000/api/auth/callback
+    name: kuberport
+    secret: local-dev-secret
+staticPasswords:
+  - email: alice@example.com
+    hash: "$2a$10$vECrnrZp1stcCkukSTINn.2ijRZSS3RUnNnvP.gg0vUvS8IhNBL7S"  # password: alice (regenerated 2026-04-17)
+    username: alice
+    userID: "alice-000"

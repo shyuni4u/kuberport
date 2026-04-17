@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: kuberport
+      POSTGRES_PASSWORD: kuberport
+      POSTGRES_DB: kuberport
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  dex:
+    image: dexidp/dex:v2.39.0
+    command: ["dex", "serve", "/config/dex.yaml"]
+    ports: ["127.0.0.1:5556:5556"]
+    volumes:
+      - ./dex.yaml:/config/dex.yaml:ro
+
+volumes:
+  pgdata:
