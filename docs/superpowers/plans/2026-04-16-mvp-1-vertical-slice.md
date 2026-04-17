@@ -2120,7 +2120,7 @@ git commit -m "feat(backend): template CRUD with draft/publish flow"
 - Create: `backend/internal/k8s/apply.go`
 - Test: `backend/internal/k8s/client_test.go`
 
-- [ ] **Step 1: Add client-go dependencies**
+- [x] **Step 1: Add client-go dependencies**
 
 ```bash
 cd backend
@@ -2129,7 +2129,7 @@ go get k8s.io/apimachinery@v0.31.0
 go get sigs.k8s.io/yaml@latest
 ```
 
-- [ ] **Step 2: Write the test against a kind cluster configured with dex**
+- [x] **Step 2: Write the test against a kind cluster configured with dex**
 
 Path: `backend/internal/k8s/client_test.go`
 ```go
@@ -2162,7 +2162,7 @@ data: { hello: world }
 }
 ```
 
-- [ ] **Step 3: Implement `client.go`**
+- [x] **Step 3: Implement `client.go`**
 
 Path: `backend/internal/k8s/client.go`
 ```go
@@ -2195,7 +2195,7 @@ func NewWithToken(apiURL, caBundle, bearer string) (*Client, error) {
 }
 ```
 
-- [ ] **Step 4: Implement `apply.go` using server-side apply**
+- [x] **Step 4: Implement `apply.go` using server-side apply**
 
 Path: `backend/internal/k8s/apply.go`
 ```go
@@ -2289,7 +2289,7 @@ func pluralize(kind string) string {
 
 (If `pluralize` returns `""`, the caller should fall back to RESTMapper. For Plan 1 we explicitly cover only the §12.1 MVP kinds.)
 
-- [ ] **Step 5: Run — integration test is opt-in; unit test validates `splitYAML`**
+- [x] **Step 5: Run — integration test is opt-in; unit test validates `splitYAML`**
 
 Add a small unit test for `splitYAML` in the same file (no k8s required):
 ```go
@@ -2308,7 +2308,7 @@ cd backend && go test ./internal/k8s/...
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/internal/k8s/
