@@ -1120,7 +1120,7 @@ git commit -m "feat(backend): OIDC verifier with request-scoped user context"
 - Create: `backend/internal/api/me.go`
 - Test: `backend/internal/api/middleware_test.go`
 
-- [ ] **Step 1: Write the middleware test**
+- [x] **Step 1: Write the middleware test**
 
 Path: `backend/internal/api/middleware_test.go`
 ```go
@@ -1165,14 +1165,14 @@ func TestAuthMiddleware_Accepts_Bearer(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run — expect failure**
+- [x] **Step 2: Run — expect failure**
 
 ```bash
 cd backend && go test ./internal/api/...
 ```
 Expected: FAIL — `api.Deps` not defined, `/v1/me` not routed.
 
-- [ ] **Step 3: Implement errors.go**
+- [x] **Step 3: Implement errors.go**
 
 Path: `backend/internal/api/errors.go`
 ```go
@@ -1198,7 +1198,7 @@ func writeError(c *gin.Context, status int, kind, detail string) {
 }
 ```
 
-- [ ] **Step 4: Implement middleware.go**
+- [x] **Step 4: Implement middleware.go**
 
 Path: `backend/internal/api/middleware.go`
 ```go
@@ -1251,7 +1251,7 @@ func requireAdmin() gin.HandlerFunc {
 }
 ```
 
-- [ ] **Step 5: Implement me.go and update routes.go**
+- [x] **Step 5: Implement me.go and update routes.go**
 
 Path: `backend/internal/api/me.go`
 ```go
@@ -1308,13 +1308,13 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 }
 ```
 
-- [ ] **Step 6: Run — expect PASS**
+- [x] **Step 6: Run — expect PASS**
 
 ```bash
 cd backend && go test ./internal/api/...
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add backend/internal/api/
