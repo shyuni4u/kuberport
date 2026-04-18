@@ -16,6 +16,12 @@ type TokenVerifier interface {
 }
 
 func requireAuth(v TokenVerifier) gin.HandlerFunc {
+	// Parse KBP_DEV_ADMIN_EMAILS once at router construction so we pay the
+	// env lookup + split cost once instead of per request, and so hot-path
+	// membership is an O(1) map lookup. The env is read at startup; changes
+	// require a restart. Never set in production — see cmd/server/main.go
+	// for the startup warning.
+	devAdminEmails := parseDevAdminEmails(os.Getenv("KBP_DEV_ADMIN_EMAILS"))
 	return func(c *gin.Context) {
 		h := c.GetHeader("Authorization")
 		if !strings.HasPrefix(h, "Bearer ") {
@@ -28,21 +34,28 @@ func requireAuth(v TokenVerifier) gin.HandlerFunc {
 			writeError(c, http.StatusUnauthorized, "unauthenticated", err.Error())
 			return
 		}
-		// Local dev override: dex staticPasswords can't emit per-user groups,
-		// so allow specific emails to be elevated to kuberport-admin via env var.
-		// Never set KBP_DEV_ADMIN_EMAILS in production.
-		if emails := os.Getenv("KBP_DEV_ADMIN_EMAILS"); emails != "" && claims.Email != "" {
-			for _, e := range strings.Split(emails, ",") {
-				if strings.EqualFold(strings.TrimSpace(e), claims.Email) {
-					claims.Groups = append(claims.Groups, "kuberport-admin")
-					break
-				}
+		if claims.Email != "" {
+			if _, ok := devAdminEmails[strings.ToLower(claims.Email)]; ok {
+				claims.Groups = append(claims.Groups, "kuberport-admin")
 			}
 		}
 		ctx := auth.WithUser(c.Request.Context(), auth.RequestUser{Claims: claims, IDToken: raw})
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
+}
+
+func parseDevAdminEmails(raw string) map[string]struct{} {
+	if raw == "" {
+		return nil
+	}
+	m := make(map[string]struct{})
+	for _, e := range strings.Split(raw, ",") {
+		if e = strings.TrimSpace(strings.ToLower(e)); e != "" {
+			m[e] = struct{}{}
+		}
+	}
+	return m
 }
 
 func requireAdmin() gin.HandlerFunc {
