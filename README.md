@@ -5,7 +5,7 @@
 > Template-driven self-service portal for Kubernetes.
 > Admins publish YAML + ui-spec templates; non-experts deploy and operate via abstracted forms.
 
-**Status:** Plan 1 (vertical slice) shipped. You can log in, register a cluster, publish a YAML-mode template, and deploy it. Plan 2 (Admin UX) and Plan 3 (User observability) are not written yet.
+**Status:** Plan 1 (vertical slice) shipped. You can log in, register a cluster, publish a YAML-mode template, and deploy it. Plan 2 (Admin UX) is in the design phase; Plan 3 (User observability) is not written yet.
 
 ---
 

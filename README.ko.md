@@ -5,7 +5,7 @@
 > Kubernetes 를 위한 템플릿 기반 셀프서비스 포털.
 > 관리자는 YAML + ui-spec 템플릿을 발행하고, 비전문 사용자는 추상화된 폼으로 배포·운영한다.
 
-**상태:** Plan 1 (vertical slice) 출시. 로그인 → 클러스터 등록 → YAML 모드 템플릿 발행 → 배포까지 동작한다. Plan 2(Admin UX)·Plan 3(User observability)은 아직 작성 전.
+**상태:** Plan 1 (vertical slice) 출시. 로그인 → 클러스터 등록 → YAML 모드 템플릿 발행 → 배포까지 동작한다. Plan 2(Admin UX)는 설계 단계이고, Plan 3(User observability)은 아직 작성 전.
 
 ---
 
