@@ -103,3 +103,34 @@ var kindToPlural = map[string]string{
 func pluralize(kind string) string {
 	return kindToPlural[kind]
 }
+
+// mvpResources lists the GVRs for all MVP-supported kinds.
+var mvpResources = []schema.GroupVersionResource{
+	{Group: "apps", Version: "v1", Resource: "deployments"},
+	{Group: "apps", Version: "v1", Resource: "statefulsets"},
+	{Group: "apps", Version: "v1", Resource: "daemonsets"},
+	{Group: "batch", Version: "v1", Resource: "jobs"},
+	{Group: "batch", Version: "v1", Resource: "cronjobs"},
+	{Group: "", Version: "v1", Resource: "services"},
+	{Group: "networking.k8s.io", Version: "v1", Resource: "ingresses"},
+	{Group: "", Version: "v1", Resource: "configmaps"},
+	{Group: "", Version: "v1", Resource: "secrets"},
+	{Group: "", Version: "v1", Resource: "persistentvolumeclaims"},
+}
+
+// DeleteByRelease deletes all MVP resources matching the kuberport.io/release label.
+func (c *Client) DeleteByRelease(ctx context.Context, namespace, release string) error {
+	sel := "kuberport.io/release=" + release
+	errs := make([]error, 0, len(mvpResources))
+	for _, r := range mvpResources {
+		if err := ctx.Err(); err != nil {
+			errs = append(errs, err)
+			break
+		}
+		if err := c.dyn.Resource(r).Namespace(namespace).
+			DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: sel}); err != nil {
+			errs = append(errs, fmt.Errorf("delete %s: %w", r.Resource, err))
+		}
+	}
+	return errors.Join(errs...)
+}
