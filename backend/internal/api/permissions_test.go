@@ -23,10 +23,8 @@ func TestPermissions_GlobalTemplate_NonAdminDenied(t *testing.T) {
 	name := seedGlobalTemplate(t, adminR)
 
 	// Non-admin attempts to deprecate the global template.
-	// Expected: 403 Forbidden (or 404 if the deprecate endpoint doesn't exist yet).
-	// This test documents that permission checking works once Task 11 wires the endpoint.
 	w := do(t, userR, http.MethodPost, "/v1/templates/"+name+"/versions/1/deprecate", nil)
-	require.NotEqual(t, http.StatusOK, w.Code, "non-admin should not be able to mutate global template")
+	require.Equal(t, http.StatusForbidden, w.Code)
 }
 
 // TestPermissions_TeamTemplate_EditorAllowed verifies that team editors
@@ -61,13 +59,8 @@ func TestPermissions_TeamTemplate_EditorAllowed(t *testing.T) {
 	publishV1(t, adminR, name)
 
 	// Alice (editor) attempts to deprecate the template.
-	// Expected: 200 OK if the deprecate endpoint exists and permission check passes.
-	// Currently may be 404 (endpoint doesn't exist until Task 11) or 403 if owning_team_id not set.
 	w := do(t, userR, http.MethodPost, "/v1/templates/"+name+"/versions/1/deprecate", nil)
-	// For now, we document that this test will pass once Task 10 + Task 11 are done.
-	// If 404, endpoint doesn't exist. If 403, likely owning_team_id not persisted (Task 10 needed).
-	// If 200, both tasks are done and permission check is working.
-	_ = w // test passes if it doesn't panic
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 }
 
 // TestPermissions_TeamTemplate_ViewerDenied verifies that team viewers
@@ -102,7 +95,6 @@ func TestPermissions_TeamTemplate_ViewerDenied(t *testing.T) {
 	publishV1(t, adminR, name)
 
 	// Bob (viewer) attempts to deprecate the template.
-	// Expected: 403 Forbidden (or 404 if the deprecate endpoint doesn't exist).
 	w := do(t, userR, http.MethodPost, "/v1/templates/"+name+"/versions/1/deprecate", nil)
-	require.NotEqual(t, http.StatusOK, w.Code, "viewer should not be able to mutate team template")
+	require.Equal(t, http.StatusForbidden, w.Code)
 }

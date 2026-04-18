@@ -245,3 +245,47 @@ func (h *Handlers) PublishVersion(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, published)
 }
+
+func (h *Handlers) DeprecateVersion(c *gin.Context) {
+	_, ok := h.ensureTemplateEditor(c, c.Param("name"))
+	if !ok {
+		return
+	}
+	h.setVersionStatus(c, "published", "deprecated")
+}
+
+func (h *Handlers) UndeprecateVersion(c *gin.Context) {
+	_, ok := h.ensureTemplateEditor(c, c.Param("name"))
+	if !ok {
+		return
+	}
+	h.setVersionStatus(c, "deprecated", "published")
+}
+
+func (h *Handlers) setVersionStatus(c *gin.Context, expected, newStatus string) {
+	name := c.Param("name")
+	vnum, err := strconv.Atoi(c.Param("v"))
+	if err != nil {
+		writeError(c, http.StatusBadRequest, "validation-error", "v must be an integer")
+		return
+	}
+	tv, err := h.deps.Store.GetTemplateVersion(c, store.GetTemplateVersionParams{Name: name, Version: int32(vnum)})
+	if err != nil {
+		writeError(c, http.StatusNotFound, "not-found", "template version")
+		return
+	}
+	if tv.Status != expected {
+		writeError(c, http.StatusConflict, "conflict",
+			"version is "+tv.Status+", expected "+expected)
+		return
+	}
+	updated, err := h.deps.Store.SetTemplateVersionStatus(c, store.SetTemplateVersionStatusParams{
+		ID: tv.ID, Status: newStatus,
+	})
+	if err != nil {
+		log.Printf("SetTemplateVersionStatus: %v", err)
+		writeError(c, http.StatusInternalServerError, "internal", "failed to update version status")
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}

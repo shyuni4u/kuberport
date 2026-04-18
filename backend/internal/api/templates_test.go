@@ -138,3 +138,25 @@ func TestTemplates_Create_OwningTeam(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	require.Contains(t, w.Body.String(), `"owning_team_id"`)
 }
+
+func TestTemplates_Deprecate_RoundTrip(t *testing.T) {
+	r := newTestRouterAdmin(t)
+	name := seedGlobalTemplate(t, r)
+	publishV1(t, r, name)
+
+	w := do(t, r, http.MethodPost, "/v1/templates/"+name+"/versions/1/deprecate", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"status":"deprecated"`)
+
+	w = do(t, r, http.MethodPost, "/v1/templates/"+name+"/versions/1/undeprecate", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"status":"published"`)
+}
+
+func TestTemplates_Deprecate_OnlyFromPublished(t *testing.T) {
+	r := newTestRouterAdmin(t)
+	name := seedGlobalTemplate(t, r)
+	// Don't publish — deprecating a draft must 409.
+	w := do(t, r, http.MethodPost, "/v1/templates/"+name+"/versions/1/deprecate", nil)
+	require.Equal(t, http.StatusConflict, w.Code)
+}
