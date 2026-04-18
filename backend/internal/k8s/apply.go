@@ -17,16 +17,19 @@ import (
 
 // ApplyAll server-side applies every doc in a multi-document YAML stream.
 // Objects without metadata.namespace inherit the namespace argument.
+// All documents are attempted even if some fail; errors are aggregated.
 func (c *Client) ApplyAll(ctx context.Context, namespace string, multiDoc []byte) error {
 	objs, err := splitYAML(multiDoc)
 	if err != nil {
 		return fmt.Errorf("split yaml: %w", err)
 	}
+	var errs []error
 	for _, o := range objs {
 		gvk := o.GroupVersionKind()
 		plural := pluralize(gvk.Kind)
 		if plural == "" {
-			return fmt.Errorf("unsupported kind %q (MVP supports §12.1 only)", gvk.Kind)
+			errs = append(errs, fmt.Errorf("unsupported kind %q (MVP supports §12.1 only)", gvk.Kind))
+			continue
 		}
 		gvr := schema.GroupVersionResource{
 			Group:    gvk.Group,
@@ -38,17 +41,19 @@ func (c *Client) ApplyAll(ctx context.Context, namespace string, multiDoc []byte
 		}
 		buf, err := yaml.Marshal(o.Object)
 		if err != nil {
-			return fmt.Errorf("marshal %s/%s/%s: %w", gvk.Kind, o.GetNamespace(), o.GetName(), err)
+			errs = append(errs, fmt.Errorf("marshal %s/%s/%s: %w", gvk.Kind, o.GetNamespace(), o.GetName(), err))
+			continue
 		}
 		_, err = c.dyn.Resource(gvr).Namespace(o.GetNamespace()).Patch(
 			ctx, o.GetName(), types.ApplyPatchType, buf,
 			metav1.PatchOptions{FieldManager: "kuberport", Force: boolPtr(true)},
 		)
 		if err != nil {
-			return fmt.Errorf("apply %s/%s/%s: %w", gvk.Kind, o.GetNamespace(), o.GetName(), err)
+			errs = append(errs, fmt.Errorf("apply %s/%s/%s: %w", gvk.Kind, o.GetNamespace(), o.GetName(), err))
+			continue
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func boolPtr(b bool) *bool { return &b }
@@ -72,19 +77,21 @@ func splitYAML(src []byte) ([]*unstructured.Unstructured, error) {
 	return out, nil
 }
 
-// pluralize covers only the §12.1 MVP kinds. Unknown kinds return "" so the caller can surface a clear error.
+// kindToPlural covers only the §12.1 MVP kinds. Unknown kinds map to ""
+// so the caller can surface a clear error.
+var kindToPlural = map[string]string{
+	"Deployment":            "deployments",
+	"StatefulSet":           "statefulsets",
+	"DaemonSet":             "daemonsets",
+	"Job":                   "jobs",
+	"CronJob":               "cronjobs",
+	"Service":               "services",
+	"Ingress":               "ingresses",
+	"ConfigMap":             "configmaps",
+	"Secret":                "secrets",
+	"PersistentVolumeClaim": "persistentvolumeclaims",
+}
+
 func pluralize(kind string) string {
-	m := map[string]string{
-		"Deployment":            "deployments",
-		"StatefulSet":           "statefulsets",
-		"DaemonSet":             "daemonsets",
-		"Job":                   "jobs",
-		"CronJob":               "cronjobs",
-		"Service":               "services",
-		"Ingress":               "ingresses",
-		"ConfigMap":             "configmaps",
-		"Secret":                "secrets",
-		"PersistentVolumeClaim": "persistentvolumeclaims",
-	}
-	return m[kind]
+	return kindToPlural[kind]
 }
