@@ -84,19 +84,25 @@ Plan 2 는 **admin 이 클릭으로 템플릿을 만들고 팀 단위로 소유*
 ### 4.1 스키마 fetch 파이프라인
 
 ```
-admin UI → Go API GET /v1/clusters/:name/openapi
-        → client-go: discovery.OpenAPISchema()  [사용자의 id_token 포워딩]
-        → Gzip-압축한 JSON 반환, 60분 메모리 캐시 per (cluster, user)
-admin UI: 응답을 파싱해 kind 트리 생성 (TypeScript 측에서 @kubernetes-models/openapi 같은 헬퍼 사용 검토)
+1. admin UI 가 kind 목록을 요청:
+   GET /v1/clusters/:name/openapi              → apisGroupVersion 인덱스 (v3)
+   GET /v1/clusters/:name/openapi/:gv          → 특정 GroupVersion 의 스키마만 lazy fetch
+2. Go API 는 client-go discovery 로 k8s 의 /openapi/v3 를 호출. 사용자 id_token 포워딩.
+3. 응답은 gzip 압축 후 반환. 에디터는 kind 클릭 시점에만 GV 스키마를 가져옴.
 ```
 
-**인증**: 유저 id_token 을 k8s API 로 그대로 포워딩한다 (Plan 1 원칙 그대로). 앱이 전용 서비스 어카운트를 갖지 않는 것이 Plan 1 보안 모델의 핵심이라 openapi 조회도 동일 경로.
+**왜 OpenAPI v3?** (k8s 1.24+ 표준) 전체 스키마를 한 방에 내리는 v2 와 달리 GVK 단위로 분할 조회 가능. CRD 수백 개 있는 클러스터에서도 초기 kind 목록 응답이 작고, 사용자가 선택한 kind 의 스키마만 정말로 페칭된다 — 메모리 캐시 부담과 초기 로드 시간이 한 자릿수 MB 레벨로 떨어짐.
 
-**캐시 키가 user 포함인 이유** — openapi 응답은 사용자 RBAC 에 따라 일부 API 가 숨겨질 수 있음. 여러 admin 이 같은 클러스터를 봐도 RBAC 가 다르면 응답이 다를 수 있어 user 별 캐시.
+**인증**: 유저 id_token 을 k8s API 로 그대로 포워딩한다 (Plan 1 원칙 그대로). 앱이 전용 서비스 어카운트를 갖지 않는 것이 Plan 1 보안 모델의 핵심이라 openapi 조회도 동일 경로. OpenAPI 읽기는 k8s 기본 `system:discovery` ClusterRole 에 포함되어 있어 대부분의 인증된 유저가 이미 가지고 있음.
 
-**Refresh** — admin 버튼 1회 클릭으로 해당 (cluster, user) 캐시 invalidate.
+**캐시 전략** — `(cluster, user, groupVersion)` 키로 인메모리 LRU 캐시.
+- 크기 상한: 기본 **64 엔트리** (환경변수 `KBP_OPENAPI_CACHE_MAX` 로 조절), 엔트리 TTL 60 분.
+- 사용자 RBAC 차이를 반영하기 위해 user 를 키에 포함 (공용 캐시로 하면 RBAC 가 약한 유저의 응답을 강한 유저가 보게 될 수 있음).
+- 메모리 상한 이슈가 재발하면 Plan 3 에서 Redis / on-disk 로 이전 검토.
 
-**CRD 지원** — 별도 코드 없음. `/openapi/v2` 가 CRD 스키마까지 포함하므로 kind 목록에 자연스럽게 섞여 나타남.
+**Refresh** — admin 버튼 1회 클릭으로 해당 `(cluster, user, *)` 캐시 invalidate.
+
+**CRD 지원** — 별도 코드 없음. v3 의 GroupVersion 인덱스에 CRD 의 GroupVersion 이 함께 나열되므로 core 리소스와 동일한 흐름으로 선택·편집 가능.
 
 ### 4.2 UI state → resources.yaml + ui-spec.yaml 직렬화
 
@@ -221,7 +227,12 @@ column "ui_state_json"  { type = jsonb null = true }                           #
 
 ### 6.2 변경된 엔드포인트
 
-- `POST /v1/templates` — body 에 `owning_team_id` (optional) 추가. `authoring_mode` 는 여전히 서버가 결정 (요청에 `ui_state_json` 있으면 `'ui'`, 아니면 `'yaml'`).
+- `POST /v1/templates` — body 에 다음 필드 추가:
+  - `owning_team_id` (optional) — null 이면 글로벌 템플릿.
+  - `authoring_mode` (required, `"yaml"` | `"ui"`) — 클라이언트가 의도를 명시. 서버는 `mode` 와 페이로드 정합성을 검증:
+    - `mode="ui"` 인데 `ui_state_json` 없음 → `400 validation-error`.
+    - `mode="yaml"` 인데 `ui_state_json` 있음 → `400 validation-error`.
+  - 서버가 `ui_state_json` 유무로 암시 추론하지 않음 (클라 실수를 조용히 잘못된 모드로 저장하는 것을 막기 위함).
 - `POST /v1/releases` — deprecated 버전으로는 `400 validation-error` 반환. 기존 릴리스의 status 조회는 무관.
 
 ### 6.3 UI state 저장 포맷
