@@ -2,12 +2,12 @@
 
 | | |
 |---|---|
-| 버전 | 0.1 (draft) |
+| 버전 | 0.2 |
 | 날짜 | 2026-04-18 |
-| 상태 | **사용자 리뷰 대기** |
+| 상태 | **리뷰 준비됨** (v0.1 의 미결 4건 확정 반영) |
 | 범위 | Plan 2 (Admin UX): UI 모드 에디터, publish/deprecate, 버전 히스토리, 팀/소유권 (미들 스코프) |
 | 이전 문서 | [초기 디자인 스펙](2026-04-16-initial-design.md), [브레인스토밍 §12](../../brainstorming-summary.md) |
-| 변경 이력 | v0.1 (2026-04-18) — 초안 |
+| 변경 이력 | v0.2 (2026-04-18) — §8 미결 4건 확정 반영, 해당 내용을 §4/§6/§7 에 통합. · v0.1 (2026-04-18) — 초안 |
 
 이 문서는 Plan 1 (vertical slice) 머지 후 Plan 2 로 넘어가기 전 합의해야 할 구조만 다룬다. UI 픽셀 단위 디자인, 마이크로 인터랙션은 실행 단계에서 정한다. 승인 후 `writing-plans` 스킬로 태스크 분해.
 
@@ -85,12 +85,14 @@ Plan 2 는 **admin 이 클릭으로 템플릿을 만들고 팀 단위로 소유*
 
 ```
 admin UI → Go API GET /v1/clusters/:name/openapi
-        → client-go: discovery.OpenAPISchema() [user's id_token]
+        → client-go: discovery.OpenAPISchema()  [사용자의 id_token 포워딩]
         → Gzip-압축한 JSON 반환, 60분 메모리 캐시 per (cluster, user)
 admin UI: 응답을 파싱해 kind 트리 생성 (TypeScript 측에서 @kubernetes-models/openapi 같은 헬퍼 사용 검토)
 ```
 
-**캐시 키가 user 포함인 이유** — openapi 응답은 사용자 RBAC 에 따라 일부 API 가 숨겨질 수 있음. 단순화 위해 first user's view 를 공용 캐시로 쓰는 건 보안 리스크.
+**인증**: 유저 id_token 을 k8s API 로 그대로 포워딩한다 (Plan 1 원칙 그대로). 앱이 전용 서비스 어카운트를 갖지 않는 것이 Plan 1 보안 모델의 핵심이라 openapi 조회도 동일 경로.
+
+**캐시 키가 user 포함인 이유** — openapi 응답은 사용자 RBAC 에 따라 일부 API 가 숨겨질 수 있음. 여러 admin 이 같은 클러스터를 봐도 RBAC 가 다르면 응답이 다를 수 있어 user 별 캐시.
 
 **Refresh** — admin 버튼 1회 클릭으로 해당 (cluster, user) 캐시 invalidate.
 
@@ -102,7 +104,9 @@ admin 의 트리 편집 결과를 JSON state 로 보관:
 
 ```ts
 type UIModeTemplate = {
-  clusterName: string;        // 스키마를 가져온 출처 (다른 클러스터 배포는 호환성 검증)
+  // 저장되지 않음 — 에디터 세션에서 스키마 fetch 한 출처를 로컬로만 기억.
+  // 템플릿 자체는 클러스터-중립 (배포 시 다른 클러스터 선택 자유).
+  // authoredCluster: string;  // (session-only, not persisted)
   resources: Array<{
     kind: string;              // "Deployment"
     apiVersion: string;        // "apps/v1"
@@ -206,6 +210,7 @@ column "ui_state_json"  { type = jsonb null = true }                           #
 |--------|------|------|------|
 | GET | `/v1/clusters/:name/openapi` | 해당 클러스터의 OpenAPI v2 (gzip, 캐시된 것 또는 fresh) | 인증만 |
 | POST | `/v1/clusters/:name/openapi/refresh` | 캐시 invalidate | 인증만 |
+| POST | `/v1/templates/preview` | UI state JSON → `resources_yaml` + `ui_spec_yaml` (stateless, DB 안 건드림). 에디터의 live preview 용. | 인증만 |
 | GET | `/v1/teams` | 내가 속한 팀 목록 (admin 은 전체) | 인증 |
 | POST | `/v1/teams` | 팀 생성 | `kuberport-admin` |
 | GET | `/v1/teams/:id/members` | 팀 멤버 목록 | 팀 멤버 or `kuberport-admin` |
@@ -255,41 +260,37 @@ Plan 1 엔드포인트 한 개(`POST /v1/templates` + `PUT /v1/templates/:name/v
 - `SchemaTree` — openapi 응답을 파싱해 재귀 렌더. 필드 클릭 시 `FieldInspector` 에 선택값 전달.
 - `FieldInspector` — "고정 / 노출" 토글 + 타입별 입력 + ui-spec 메타 폼.
 - `KindPicker` — `/openapi` 응답에서 kind 목록 추림 (core + apps/v1 + batch/v1 + CRD).
-- `YamlPreview` — Monaco read-only, `ui_state_json` 변경 시 서버 serialize 를 debounce 호출하거나 클라이언트측 경량 직렬화 (결정 중 — §8).
+- `YamlPreview` — Monaco read-only. `ui_state_json` 변경 시 **300ms debounce 후 `POST /v1/templates/preview` 호출** 하여 서버가 직렬화한 YAML 을 표시. 클라이언트측 직렬화기는 두지 않음 (직렬화 로직 single source of truth: Go 백엔드).
 
 ---
 
-## 8. 미결 질문 (승인 전 합의 필요)
+## 8. 확정된 결정 (v0.1 의 미결 4건)
 
-### 8.1 Live YAML preview 의 직렬화 주체
+v0.1 §8 에 남겨둔 4 개 질문은 2026-04-18 브레인스토밍에서 아래와 같이 확정되었다. 각 항목은 이 문서의 해당 섹션에 이미 반영되었으며, 결정 근거는 기록 목적으로만 여기에 남긴다.
 
-- **옵션 A**: 클라이언트에서 경량 직렬화 → preview. 저장 시에만 서버가 재직렬화해서 dry-run.
-  - 장점: 즉각 반응. 단점: 클라/서버 두 벌 구현.
-- **옵션 B**: 서버의 `POST /v1/templates/preview` (dry-run) 로 모든 preview 요청. debounce 300ms.
-  - 장점: 단일 구현. 단점: 네트워크 round-trip, 오프라인 편집 불가.
+### 8.1 Live YAML preview 직렬화 주체 → **서버 preview 엔드포인트 (B)**
 
-**예비 추천**: **B** — 드로잉/타자 수준 인터랙션이 아니므로 300ms debounce 체감 괜찮음.
+→ 반영: §7.3 `YamlPreview` 컴포넌트, §6.1 신규 엔드포인트 `POST /v1/templates/preview`
 
-### 8.2 UI state 의 `clusterName` 고정 vs 재선택 가능
+근거: 직렬화 로직을 Go 한 곳에만 두면 클라/서버 drift 위험이 사라진다. 300ms debounce 로 network round-trip 체감 작고, 오프라인 편집은 Plan 2 유즈케이스 아님.
 
-- A: 저자 시점 클러스터로 고정. 다른 클러스터에 배포 시 "스키마 호환성 경고" 표시 (하지만 차단 X).
-- B: 배포 시 클러스터 자유 선택, 호환성은 apply 시 k8s 가 판단.
+### 8.2 UI state 의 `clusterName` 저장 여부 → **저장 안 함 / 세션 로컬 힌트만 (B)**
 
-**예비 추천**: **B** (Plan 1 동작 유지). 저자 시점 `clusterName` 은 단순 힌트로 남겨두고 배포 로직은 건드리지 않음.
+→ 반영: §4.2 `UIModeTemplate` 타입 주석
 
-### 8.3 팀 생성·멤버 관리 UI 를 Plan 2 에 포함 vs Plan 2 는 API 만
+근거: 대부분 템플릿이 core 리소스라 클러스터 간 차이 없음. CRD 불일치는 apply 시점의 "resource not found" 로 충분히 명확. 저자 클러스터 고정은 false-positive 경고를 낳고 재배포 유연성만 깎음.
 
-- A: `/admin/teams` 페이지까지 Plan 2 로.
-- B: Plan 2 는 팀 스키마 + API 만. UI 는 `kubectl`/curl 로 admin 이 관리. 페이지는 Plan 3.
+### 8.3 팀 관리 UI → **Plan 2 에 포함 (A)**
 
-**예비 추천**: **A** — 팀 없이 소유권 모델 검증이 되지 않음. 프런트 작업량 적음 (리스트 + 모달 2 개).
+→ 반영: §7.1 `/admin/teams`, `/admin/teams/:id` 페이지
 
-### 8.4 스키마 fetch 인증
+근거: 팀 기반 권한 모델이 Plan 2 데이터 스키마에 들어가는데 UI 가 없으면 브라우저 검증이 안 됨. 프런트 작업량도 리스트 1 + 상세 1 + 모달 2 로 적음.
 
-- A: user's id_token 을 그대로 k8s API 에 포워딩 (Plan 1 원칙 유지). 각 user 별 캐시.
-- B: 앱의 서비스 어카운트로 포워딩 (캐시 공유 가능). Plan 1 원칙(토큰 그대로 포워딩) 위반.
+### 8.4 스키마 fetch 인증 → **유저 id_token 포워딩 (A)**
 
-**예비 추천**: **A** — 보안 모델 단순성 우선.
+→ 반영: §4.1 파이프라인 인증 단계
+
+근거: Plan 1 의 "앱은 UX 레이어, 모든 k8s 콜은 유저 토큰" 원칙 일관성. 앱 SA 도입하면 다른 기능에서도 타협 유혹 생김. RBAC 별 응답 차이를 user 별 캐시로 자연스럽게 흡수.
 
 ---
 
