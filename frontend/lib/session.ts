@@ -86,15 +86,23 @@ export async function getSession(): Promise<Session | null> {
     [id],
   );
   if (!rows[0]) return null;
-  return {
-    id: rows[0].id,
-    userId: rows[0].user_id,
-    idToken: decrypt(rows[0].id_token_encrypted),
-    refreshToken: rows[0].refresh_token_encrypted
-      ? decrypt(rows[0].refresh_token_encrypted)
-      : undefined,
-    idTokenExp: rows[0].id_token_exp,
-  };
+  try {
+    return {
+      id: rows[0].id,
+      userId: rows[0].user_id,
+      idToken: decrypt(rows[0].id_token_encrypted),
+      refreshToken: rows[0].refresh_token_encrypted
+        ? decrypt(rows[0].refresh_token_encrypted)
+        : undefined,
+      idTokenExp: rows[0].id_token_exp,
+    };
+  } catch {
+    // Tampered or key-rotated session — treat as invalid and force re-login.
+    // DB delete is authoritative; the stale cookie will be rejected on next load.
+    // (cookieStore.delete is readonly in Server Components, so we skip it here.)
+    await pool.query("DELETE FROM sessions WHERE id=$1", [id]);
+    return null;
+  }
 }
 
 export async function updateSessionTokens(

@@ -8,10 +8,16 @@ export default async function TemplateDetail({
   params: Promise<{ name: string }>;
 }) {
   const { name } = await params;
-  const t = await apiFetch(`/v1/templates/${name}`).then((r) => r.json());
-  const vs = await apiFetch(`/v1/templates/${name}/versions`).then((r) =>
-    r.json(),
-  );
+  const tRes = await apiFetch(`/v1/templates/${name}`);
+  if (!tRes.ok) {
+    throw new Error(`템플릿 조회 실패: ${tRes.status} ${await tRes.text()}`);
+  }
+  const t = await tRes.json();
+  const vsRes = await apiFetch(`/v1/templates/${name}/versions`);
+  if (!vsRes.ok) {
+    throw new Error(`버전 조회 실패: ${vsRes.status} ${await vsRes.text()}`);
+  }
+  const vs = await vsRes.json();
 
   async function publish(formData: FormData) {
     "use server";
