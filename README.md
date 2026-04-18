@@ -70,7 +70,7 @@ Browser ── Next.js (k8s Pod, BFF) ── Go API (in k8s) ── Target k8s c
 
 Full details: [docs/superpowers/specs/2026-04-16-initial-design.md](docs/superpowers/specs/2026-04-16-initial-design.md).
 
-## Quick start (once Plan 1 lands)
+## Quick start
 
 ```bash
 # 1. Boot local Postgres + dex (OIDC)
@@ -90,7 +90,26 @@ pnpm install && pnpm dev
 # 5. Open http://localhost:3000 and log in as alice / alice
 ```
 
-Until Plan 1 is executed these commands will fail — there is no `backend/` or `frontend/` code yet. Follow the roadmap below to see where things stand.
+Plan 1 is now in-progress — `backend/` and `frontend/` are scaffolded. See [the plan](docs/superpowers/plans/2026-04-16-mvp-1-vertical-slice.md) for the task-by-task status.
+
+## Running tests
+
+```bash
+# Unit + integration (compose must be up; see backend/CLAUDE.md)
+make test                      # equivalent: cd backend && go test ./...
+
+# End-to-end happy path (requires a kind cluster; see Task 22 in the plan)
+export KBP_KIND_API=https://127.0.0.1:6443
+make e2e
+```
+
+## Prerequisites
+
+- Docker (for local Postgres + dex)
+- Go 1.22+
+- Node 20+, pnpm 9+
+- [`atlas`](https://atlasgo.io) CLI (DB migrations), `sqlc`
+- (e2e only) a kind cluster and `kubectl`
 
 ## Roadmap
 

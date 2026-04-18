@@ -2324,7 +2324,7 @@ git commit -m "feat(backend): k8s client factory and multi-doc server-side apply
 - Test: `backend/internal/api/releases_test.go`
 - Modify: `backend/internal/api/routes.go`
 
-- [ ] **Step 1: Write the test (uses stub k8s factory)**
+- [x] **Step 1: Write the test (uses stub k8s factory)**
 
 Path: `backend/internal/api/releases_test.go`
 ```go
@@ -2375,7 +2375,7 @@ func TestReleases_CreateAndList(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Implement handlers**
+- [x] **Step 2: Implement handlers**
 
 Path: `backend/internal/api/releases.go`
 ```go
@@ -2488,7 +2488,7 @@ v.DELETE("/releases/:id", h.DeleteRelease)
 
 Add `K8sFactory` to `Deps`.
 
-- [ ] **Step 3: Add a `DeleteByLabels` helper to `internal/k8s`**
+- [x] **Step 3: Add a `DeleteByLabels` helper to `internal/k8s`**
 
 Path: `backend/internal/k8s/apply.go` (append)
 ```go
@@ -2516,13 +2516,13 @@ func (c *Client) DeleteByRelease(ctx context.Context, namespace, release string)
 }
 ```
 
-- [ ] **Step 4: Run — expect PASS**
+- [x] **Step 4: Run — expect PASS**
 
 ```bash
 cd backend && go test ./internal/api/... -run Releases
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/
@@ -2538,7 +2538,7 @@ git commit -m "feat(backend): release create/list/get/delete wired to k8s applie
 - Create: `backend/internal/k8s/status.go`
 - Test: `backend/internal/api/releases_test.go` (extend)
 
-- [ ] **Step 1: Write the test for `/v1/releases/:id` response shape**
+- [x] **Step 1: Write the test for `/v1/releases/:id` response shape**
 
 Add to `releases_test.go`:
 ```go
@@ -2553,7 +2553,7 @@ func TestReleases_Get_IncludesInstanceCount(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Add `ListInstances` to `k8s.Client`**
+- [x] **Step 2: Add `ListInstances` to `k8s.Client`**
 
 Path: `backend/internal/k8s/status.go`
 ```go
@@ -2602,7 +2602,7 @@ func (c *Client) ListInstances(ctx context.Context, namespace, release string) (
 // small helpers (unstructuredField, containerStatusesReady, totalRestarts) — each ~10 lines
 ```
 
-- [ ] **Step 3: Extend `GetRelease` handler**
+- [x] **Step 3: Extend `GetRelease` handler**
 
 ```go
 func (h *Handlers) GetRelease(c *gin.Context) {
@@ -2636,13 +2636,13 @@ func (h *Handlers) GetRelease(c *gin.Context) {
 
 `abstractStatus` returns `"healthy"` / `"warning"` / `"error"` based on pod state (10 lines).
 
-- [ ] **Step 4: Run — expect PASS**
+- [x] **Step 4: Run — expect PASS**
 
 ```bash
 cd backend && go test ./internal/api/... -run Releases
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/
@@ -2656,7 +2656,7 @@ git commit -m "feat(backend): release get returns abstract status and instance c
 **Files:**
 - Create: `frontend/*` (entire Next.js project)
 
-- [ ] **Step 1: Create app**
+- [x] **Step 1: Create app**
 
 ```bash
 cd frontend..  # back to repo root
@@ -2665,21 +2665,21 @@ cd frontend
 pnpm install
 ```
 
-- [ ] **Step 2: Add shadcn/ui**
+- [x] **Step 2: Add shadcn/ui**
 
 ```bash
 pnpm dlx shadcn@latest init --yes --defaults
 pnpm dlx shadcn@latest add button card input select dialog badge table
 ```
 
-- [ ] **Step 3: Add Monaco, React Hook Form, Zod, openid-client, iron-session, pg**
+- [x] **Step 3: Add Monaco, React Hook Form, Zod, openid-client, iron-session, pg**
 
 ```bash
 pnpm add @monaco-editor/react react-hook-form zod @hookform/resolvers openid-client iron-session pg
 pnpm add -D @types/pg
 ```
 
-- [ ] **Step 4: Add a healthcheck page to confirm build**
+- [x] **Step 4: Add a healthcheck page to confirm build**
 
 Path: `frontend/app/page.tsx`
 ```tsx
@@ -2692,7 +2692,7 @@ export default function Home() {
 }
 ```
 
-- [ ] **Step 5: Enable standalone output for future Helm chart packaging**
+- [x] **Step 5: Enable standalone output for future Helm chart packaging**
 
 Edit `frontend/next.config.ts` (or `.js` if present) to include:
 
@@ -2705,14 +2705,14 @@ export default nextConfig;
 
 Rationale: per [ADR 0001](../../decisions/0001-frontend-deployment-helm-over-vercel.md) the frontend ships inside the same Helm chart as the Go API. `standalone` builds produce a self-contained Node server at `.next/standalone/` that a minimal Dockerfile (deferred to a later plan) can COPY directly. Setting this now avoids a reconfigure churn later.
 
-- [ ] **Step 6: Smoke build**
+- [x] **Step 6: Smoke build**
 
 ```bash
 pnpm build
 ```
 Expected: success, no TS errors. Verify that `frontend/.next/standalone/server.js` exists after the build.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/
@@ -2731,7 +2731,7 @@ git commit -m "feat(frontend): scaffold Next.js 15 app with Tailwind, shadcn, Mo
 - Create: `frontend/app/api/auth/callback/route.ts`
 - Create: `frontend/app/api/auth/logout/route.ts`
 
-- [ ] **Step 1: Database client for sessions**
+- [x] **Step 1: Database client for sessions**
 
 Path: `frontend/lib/db.ts`
 ```ts
@@ -2739,7 +2739,7 @@ import { Pool } from "pg";
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 ```
 
-- [ ] **Step 2: OIDC helper**
+- [x] **Step 2: OIDC helper**
 
 Path: `frontend/lib/oidc.ts`
 ```ts
@@ -2758,7 +2758,7 @@ export async function getClient() {
 export { generators };
 ```
 
-- [ ] **Step 3: Session helper (cookie + DB)**
+- [x] **Step 3: Session helper (cookie + DB)**
 
 Path: `frontend/lib/session.ts`
 ```ts
@@ -2838,7 +2838,7 @@ export async function destroySession() {
 }
 ```
 
-- [ ] **Step 4: Login route**
+- [x] **Step 4: Login route**
 
 Path: `frontend/app/api/auth/login/route.ts`
 ```ts
@@ -2867,7 +2867,7 @@ export async function GET() {
 }
 ```
 
-- [ ] **Step 5: Callback route**
+- [x] **Step 5: Callback route**
 
 Path: `frontend/app/api/auth/callback/route.ts`
 ```ts
@@ -2905,7 +2905,7 @@ export async function GET(req: NextRequest) {
 }
 ```
 
-- [ ] **Step 6: Logout route**
+- [x] **Step 6: Logout route**
 
 Path: `frontend/app/api/auth/logout/route.ts`
 ```ts
@@ -2918,7 +2918,7 @@ export async function POST() {
 }
 ```
 
-- [ ] **Step 7: Manual smoke test**
+- [x] **Step 7: Manual smoke test**
 
 Set env in `frontend/.env.local`:
 ```
@@ -2938,7 +2938,7 @@ pnpm dev
 ```
 Expected: browser lands on `/catalog`, DB has a `users` row and a `sessions` row.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add frontend/lib/ frontend/app/api/auth/
@@ -2953,7 +2953,7 @@ git commit -m "feat(frontend): OIDC login + callback + httpOnly session cookie"
 - Create: `frontend/app/api/v1/[...path]/route.ts`
 - Create: `frontend/middleware.ts`
 
-- [ ] **Step 1: Implement BFF proxy**
+- [x] **Step 1: Implement BFF proxy**
 
 Path: `frontend/app/api/v1/[...path]/route.ts`
 ```ts
@@ -2995,7 +2995,7 @@ async function proxy(req: NextRequest, ctx: { params: { path: string[] } }) {
 export { proxy as GET, proxy as POST, proxy as PUT, proxy as DELETE };
 ```
 
-- [ ] **Step 2: Auth guard middleware**
+- [x] **Step 2: Auth guard (proxy.ts)**
 
 Path: `frontend/middleware.ts`
 ```ts
@@ -3015,7 +3015,7 @@ export function middleware(req: NextRequest) {
 }
 ```
 
-- [ ] **Step 3: Smoke test**
+- [x] **Step 3: Smoke test**
 
 With Go running on :8080, Next.js on :3000:
 ```bash
@@ -3023,7 +3023,7 @@ curl -i http://localhost:3000/api/v1/me --cookie "kbp_sid=<from browser>"
 ```
 Expected: `200 OK` with user info.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/app/api/v1/ frontend/middleware.ts
@@ -3039,7 +3039,7 @@ git commit -m "feat(frontend): BFF proxy with silent token refresh and auth guar
 - Create: `frontend/components/ClusterPicker.tsx`
 - Modify: `frontend/app/layout.tsx`
 
-- [ ] **Step 1: Layout + top bar**
+- [x] **Step 1: Layout + top bar**
 
 Path: `frontend/app/layout.tsx`
 ```tsx
@@ -3117,14 +3117,14 @@ export function ClusterPicker() {
 }
 ```
 
-- [ ] **Step 2: Smoke test**
+- [x] **Step 2: Smoke test**
 
 ```bash
 cd frontend && pnpm dev
 # open http://localhost:3000/ → shows top bar with email + cluster picker
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/
@@ -3141,7 +3141,7 @@ git commit -m "feat(frontend): top bar with cluster picker and logout"
 - Create: `frontend/app/templates/[name]/edit/page.tsx`
 - Create: `frontend/components/YamlEditor.tsx`
 
-- [ ] **Step 1: Template list**
+- [x] **Step 1: Template list**
 
 Path: `frontend/app/templates/page.tsx`
 ```tsx
@@ -3175,7 +3175,7 @@ export default async function TemplatesPage() {
 }
 ```
 
-- [ ] **Step 2: `YamlEditor.tsx`**
+- [x] **Step 2: `YamlEditor.tsx`**
 
 Path: `frontend/components/YamlEditor.tsx`
 ```tsx
@@ -3196,7 +3196,7 @@ export function YamlEditor({
 }
 ```
 
-- [ ] **Step 3: Editor page (create/edit, YAML mode only)**
+- [x] **Step 3: Editor page (create/edit, YAML mode only)**
 
 Path: `frontend/app/templates/[name]/edit/page.tsx`
 ```tsx
@@ -3276,7 +3276,7 @@ export default function EditTemplatePage() {
 }
 ```
 
-- [ ] **Step 4: Detail page (shows metadata, versions, publish button)**
+- [x] **Step 4: Detail page (shows metadata, versions, publish button)**
 
 Path: `frontend/app/templates/[name]/page.tsx`
 ```tsx
@@ -3310,11 +3310,11 @@ export default async function TemplateDetail({ params }: { params: { name: strin
 }
 ```
 
-- [ ] **Step 5: Manual smoke test**
+- [x] **Step 5: Manual smoke test**
 
 Through the UI: create template → Save → shows in list → open detail → Publish v1.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/app/templates/ frontend/components/YamlEditor.tsx
@@ -3331,7 +3331,7 @@ git commit -m "feat(frontend): template list, detail, and YAML-mode editor"
 - Create: `frontend/components/TemplateCard.tsx`
 - Create: `frontend/app/catalog/[name]/deploy/page.tsx`
 
-- [ ] **Step 1: `TemplateCard` + Catalog page**
+- [x] **Step 1: `TemplateCard` + Catalog page**
 
 Path: `frontend/components/TemplateCard.tsx`
 ```tsx
@@ -3372,7 +3372,7 @@ export default async function CatalogPage() {
 }
 ```
 
-- [ ] **Step 2: `DynamicForm`**
+- [x] **Step 2: `DynamicForm`**
 
 Path: `frontend/components/DynamicForm.tsx`
 ```tsx
@@ -3528,7 +3528,7 @@ export function DynamicForm({
 }
 ```
 
-- [ ] **Step 3: Deploy page**
+- [x] **Step 3: Deploy page**
 
 Path: `frontend/app/catalog/[name]/deploy/page.tsx`
 ```tsx
@@ -3600,11 +3600,11 @@ Add dependency:
 pnpm add yaml
 ```
 
-- [ ] **Step 4: Smoke test**
+- [x] **Step 4: Smoke test**
 
 End-to-end through the UI: catalog → card → deploy form generated from ui-spec → submit → redirect to `/releases/<id>`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/
@@ -3621,7 +3621,7 @@ git commit -m "feat(frontend): catalog + DynamicForm + deploy flow"
 - Create: `frontend/components/ReleaseTable.tsx`
 - Create: `frontend/components/StatusBadge.tsx`
 
-- [ ] **Step 1: `StatusBadge` + `ReleaseTable`**
+- [x] **Step 1: `StatusBadge` + `ReleaseTable`**
 
 Path: `frontend/components/StatusBadge.tsx`
 ```tsx
@@ -3664,7 +3664,7 @@ export function ReleaseTable({ rows }: { rows: any[] }) {
 }
 ```
 
-- [ ] **Step 2: Release list page**
+- [x] **Step 2: Release list page**
 
 Path: `frontend/app/releases/page.tsx`
 ```tsx
@@ -3681,7 +3681,7 @@ export default async function ReleasesPage() {
 }
 ```
 
-- [ ] **Step 3: Release detail page**
+- [x] **Step 3: Release detail page**
 
 Path: `frontend/app/releases/[id]/page.tsx`
 ```tsx
@@ -3720,7 +3720,7 @@ function Card({ title, children }: any) {
 }
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/
@@ -3736,7 +3736,7 @@ git commit -m "feat(frontend): release list and detail overview"
 
 This test exercises: register cluster → create + publish template → deploy release → list releases → get release → delete release. It requires docker-compose + a kind cluster (optional).
 
-- [ ] **Step 1: Write the e2e test (compose + kind)**
+- [x] **Step 1: Write the e2e test (compose + kind)**
 
 Path: `backend/e2e/e2e_test.go`
 ```go
@@ -3887,7 +3887,7 @@ func TestE2E_HappyPath(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Make target**
+- [x] **Step 2: Make target**
 
 Path: `Makefile` (root)
 ```make
@@ -3897,14 +3897,16 @@ e2e:
 	cd backend && go test -tags=e2e ./e2e/... -v
 ```
 
-- [ ] **Step 3: Run**
+- [x] **Step 3: Run**
 
 ```bash
 make e2e
 ```
 Expected: PASS in ~30-60s.
 
-- [ ] **Step 4: Commit**
+> **Note (2026-04-18)**: actual execution deferred — kind cluster not available in current dev env. Compile + skip path verified via `go test -tags=e2e ./e2e/... -run=^$`.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add backend/e2e/ Makefile
@@ -3918,7 +3920,7 @@ git commit -m "test: end-to-end happy-path smoke covering the full Plan 1 slice"
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1: Expand README with the minimum every new contributor needs**
+- [x] **Step 1: Expand README with the minimum every new contributor needs**
 
 Path: `README.md`
 ```markdown
@@ -3964,7 +3966,7 @@ make e2e
 - `docs/`      Specs, ADRs, brainstorming notes
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add README.md
