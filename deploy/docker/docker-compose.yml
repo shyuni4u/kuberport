@@ -11,9 +11,11 @@ services:
   dex:
     image: dexidp/dex:v2.39.0
     command: ["dex", "serve", "/config/dex.yaml"]
-    ports: ["127.0.0.1:5556:5556"]
+    # Binds on all interfaces so kind cluster containers can reach via host-gateway.
+    ports: ["5556:5556"]
     volumes:
       - ./dex.yaml:/config/dex.yaml:ro
+      - ./certs:/config/certs:ro
 
 volumes:
   pgdata:

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,17 @@ func requireAuth(v TokenVerifier) gin.HandlerFunc {
 		if err != nil {
 			writeError(c, http.StatusUnauthorized, "unauthenticated", err.Error())
 			return
+		}
+		// Local dev override: dex staticPasswords can't emit per-user groups,
+		// so allow specific emails to be elevated to kuberport-admin via env var.
+		// Never set KBP_DEV_ADMIN_EMAILS in production.
+		if emails := os.Getenv("KBP_DEV_ADMIN_EMAILS"); emails != "" && claims.Email != "" {
+			for _, e := range strings.Split(emails, ",") {
+				if strings.EqualFold(strings.TrimSpace(e), claims.Email) {
+					claims.Groups = append(claims.Groups, "kuberport-admin")
+					break
+				}
+			}
 		}
 		ctx := auth.WithUser(c.Request.Context(), auth.RequestUser{Claims: claims, IDToken: raw})
 		c.Request = c.Request.WithContext(ctx)
