@@ -229,6 +229,79 @@ Turborepo/nx 같은 모노레포 도구는 MVP에 과함 — 단순 디렉터리
 - 기본 StorageClass = `local-path` (노드 로컬 디스크)
 - 외부 MetalLB/cloud LB 컨트롤러 없음 (단일 노드 전제)
 
+## 12. Plan 2 결정 (Admin UX)
+
+Plan 1 (vertical slice) 머지 후 2026-04-18 확정. 이 섹션은 Plan 2 디자인 스펙을 쓰기 전에 합의한 큰 축만 기록한다. 세부 데이터 모델·API 는 spec 에.
+
+### 12.1 편집 모드: UI 모드가 주, YAML 은 read-only preview
+
+- UI 모드가 기본 편집 경로. YAML 패널은 side-by-side 로 렌더된 결과를 보여주는 **읽기 전용** 뷰.
+- Plan 1 에 있는 `POST /v1/templates` YAML 페이로드 엔드포인트는 유지 (CI/CLI 등 programmatic push 용).
+
+**배제한 대안**
+- YAML ↔ UI 토글 양방향 편집: 동기화 엣지 케이스(formatting, 코멘트 보존 등) 폭증, Plan 2 스코프 밖.
+- YAML 모드 완전 제거: Plan 1 레거시 템플릿이 편집 불가해지는 문제.
+
+### 12.2 UI 에디터 스키마 소스: 대상 클러스터의 `/openapi/v2` fetch
+
+- admin 이 편집 시작 시 대상 클러스터를 선택 → 시스템이 해당 클러스터의 OpenAPI 스키마를 fetch → kind 목록과 필드 트리 노출.
+- admin 은 kind 선택 후 트리에서 필드별로 (a) 값 고정, (b) 사용자에게 노출 (ui-spec 엔트리 생성) 중 하나를 마킹.
+
+**왜 fetch?**
+- 정적 번들은 k8s 버전 drift 로 금방 stale.
+- 실제 배포 대상 클러스터의 스키마가 저자 시점 검증의 단일 진실 소스.
+- **CRD 자동 지원 포함** — 원래 v1.1 로 미뤄둔 "관리자 수동 등록 CRD" 항목이 이 경로로 자연스럽게 흡수됨. (§6 `v1.1 (B안)` 항목은 이 결정으로 Plan 2 로 앞당겨짐.)
+
+**운영 고려**
+- openapi 응답이 큼 → 클러스터별 인메모리 캐시 + 관리자 "refresh" 버튼.
+- 권한: openapi 엔드포인트는 인증만 필요 (별도 RBAC 불요).
+
+### 12.3 Plan 1 레거시(YAML) 템플릿 취급: 읽기 전용 preview
+
+- Plan 1 에서 YAML 로 만들어진 템플릿 버전은 새 UI 에디터로 편집 불가.
+- 상세 페이지에서 YAML preview + metadata 표시만.
+- 새 버전은 처음부터 UI 모드로 재작성 (자동 import 경로 없음).
+
+**왜 import 없음?**
+- `resources.yaml` 만으로는 "어떤 필드를 사용자에게 노출할지"를 추측 불가. ui-spec 없는 원본을 UI 모드로 깔끔히 올리는 방법이 없음.
+- MVP 시점 레거시 템플릿 수가 적어 재작성 비용이 변환기 구현·유지 비용보다 훨씬 낮음.
+
+**DB 스키마 변경**
+- `template_versions.authoring_mode` (enum: `yaml` / `ui`) 신설. YAML preview 전용 vs UI 에디터 편집 가능 여부를 UI 가 구분.
+
+### 12.4 Deprecate: 신규 배포 금지 + 기존 릴리스는 계속
+
+- `template_versions.status` 에 `deprecated` 상태 추가 (현재 `draft` / `published` 에서 확장).
+- 카탈로그: deprecated 버전은 배지 표시 + 상세에서만 보임. **신규 배포 버튼 비활성**.
+- 기존 릴리스는 버전에 pin 되어 있으므로 동작에 영향 없음.
+- "update available" 알림은 non-deprecated 상위 버전이 있을 때만.
+
+### 12.5 버전 히스토리: 목록 + 상태만
+
+- 템플릿 상세에서 `[v1 published, v2 published, v3 deprecated]` 정도로 단순 나열.
+- **Plan 2 스코프 아님**: 버전 간 diff, 누가 언제 바꿨는지 감사 로그, 승인 워크플로.
+- `created_at` / `created_by_user_id` 는 이미 스키마에 있음. Plan 2 UI 에선 옵션 (표시해도 되고 안 해도 되고).
+
+### 12.6 팀/소유권: 미들 스코프 (Plan 1 decision table 상 "MVP 이후로 미룸"이었던 항목 일부를 Plan 2 로 당겨옴)
+
+**포함**
+- 새 엔터티 `teams`, `team_memberships (user_id, team_id, role)`.
+- role 은 `editor` / `viewer` 두 가지만.
+- `templates.owning_team_id` (nullable) — null 이면 글로벌 템플릿 (Plan 1 호환).
+- 편집·publish·deprecate 는 `editor` 멤버만. `viewer` 는 상세 열람만.
+- 글로벌 `kuberport-admin` 그룹은 여전히 super-admin (모든 팀 override 가능).
+
+**배제 (Plan 3 이후로)**
+- 팀 초대/가입 승인 워크플로 — 팀 생성·멤버 추가는 `kuberport-admin` 이 API 로 직접.
+- 릴리스의 팀 소유 개념 — `releases` 는 Plan 1 스키마 유지 (`created_by_user_id` 만). 네임스페이스가 사실상 경계 역할.
+- 네임스페이스 ↔ 팀 매핑.
+- 팀 단위 카탈로그 가시성 (현재는 publish 된 모든 템플릿이 모든 로그인 유저에게 보임).
+
+**Plan 1 에서 가져갈 호환성**
+- `templates.owner_user_id` 는 유지 (단일 생성자 추적용). `owning_team_id` 는 옵션 오버레이.
+
+---
+
 ## 미해결 (다음 브레인스토밍 토픽)
 
 1. UI 목업 — 템플릿 해부도 / 관리자 템플릿 편집기(YAML/UI 토글) / 사용자 카탈로그 / 배포 폼 / 릴리스 상세
