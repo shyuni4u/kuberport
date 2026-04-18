@@ -114,6 +114,65 @@ func (q *Queries) InsertRelease(ctx context.Context, arg InsertReleaseParams) (R
 	return i, err
 }
 
+const listAllReleases = `-- name: ListAllReleases :many
+SELECT r.id, r.name, r.template_version_id, r.cluster_id, r.namespace, r.values_json, r.rendered_yaml, r.created_by_user_id, r.created_at, r.updated_at, c.name AS cluster_name, t.name AS template_name, tv.version AS template_version
+  FROM releases r
+  JOIN clusters c          ON c.id = r.cluster_id
+  JOIN template_versions tv ON tv.id = r.template_version_id
+  JOIN templates t         ON t.id = tv.template_id
+ ORDER BY r.created_at DESC
+`
+
+type ListAllReleasesRow struct {
+	ID                pgtype.UUID        `json:"id"`
+	Name              string             `json:"name"`
+	TemplateVersionID pgtype.UUID        `json:"template_version_id"`
+	ClusterID         pgtype.UUID        `json:"cluster_id"`
+	Namespace         string             `json:"namespace"`
+	ValuesJson        []byte             `json:"values_json"`
+	RenderedYaml      string             `json:"rendered_yaml"`
+	CreatedByUserID   pgtype.UUID        `json:"created_by_user_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ClusterName       string             `json:"cluster_name"`
+	TemplateName      string             `json:"template_name"`
+	TemplateVersion   int32              `json:"template_version"`
+}
+
+func (q *Queries) ListAllReleases(ctx context.Context) ([]ListAllReleasesRow, error) {
+	rows, err := q.db.Query(ctx, listAllReleases)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllReleasesRow
+	for rows.Next() {
+		var i ListAllReleasesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.TemplateVersionID,
+			&i.ClusterID,
+			&i.Namespace,
+			&i.ValuesJson,
+			&i.RenderedYaml,
+			&i.CreatedByUserID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ClusterName,
+			&i.TemplateName,
+			&i.TemplateVersion,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReleasesForUser = `-- name: ListReleasesForUser :many
 SELECT r.id, r.name, r.template_version_id, r.cluster_id, r.namespace, r.values_json, r.rendered_yaml, r.created_by_user_id, r.created_at, r.updated_at, c.name AS cluster_name, t.name AS template_name, tv.version AS template_version
   FROM releases r

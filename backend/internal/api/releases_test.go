@@ -11,6 +11,7 @@ import (
 
 	"kuberport/internal/api"
 	"kuberport/internal/config"
+	"kuberport/internal/store"
 )
 
 // fakeK8sApplier records calls for test assertions.
@@ -48,6 +49,17 @@ func newTestRouterWithK8s(t *testing.T) (http.Handler, *fakeK8sApplier) {
 		K8sFactory: factory,
 	})
 	return r, applier
+}
+
+// newTestRouterUserWithK8s creates a router authenticated as a non-admin user.
+func newTestRouterUserWithK8s(t *testing.T, s *store.Store, applier *fakeK8sApplier) http.Handler {
+	t.Helper()
+	factory := &fakeK8sFactory{applier: applier}
+	return api.NewRouter(config.Config{}, api.Deps{
+		Verifier:   stubVerifier{}, // non-admin
+		Store:      s,
+		K8sFactory: factory,
+	})
 }
 
 func seedCluster(t *testing.T, r http.Handler) string {
@@ -166,6 +178,91 @@ func TestReleases_Delete(t *testing.T) {
 	// get after delete → 404
 	w = do(t, r, http.MethodGet, "/v1/releases/"+id, nil)
 	require.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestReleases_Get_NonOwnerReturns403(t *testing.T) {
+	s := testStore(t)
+	applier := &fakeK8sApplier{}
+
+	// admin creates a release
+	adminRouter := api.NewRouter(config.Config{}, api.Deps{
+		Verifier: adminVerifier{}, Store: s,
+		K8sFactory: &fakeK8sFactory{applier: applier},
+	})
+	clusterName := seedCluster(t, adminRouter)
+	tplName := seedPublishedTemplate(t, adminRouter)
+
+	relName := "owned-" + randSuffix()
+	body, _ := json.Marshal(map[string]any{
+		"template": tplName, "version": 1,
+		"cluster": clusterName, "namespace": "default",
+		"name": relName, "values": map[string]any{"Deployment[web].spec.replicas": 1},
+	})
+	w := do(t, adminRouter, http.MethodPost, "/v1/releases", bytes.NewReader(body))
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	var created map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &created))
+	id := created["id"].(string)
+
+	// non-admin user tries to GET → 403
+	userRouter := newTestRouterUserWithK8s(t, s, applier)
+	w = do(t, userRouter, http.MethodGet, "/v1/releases/"+id, nil)
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "not the release owner")
+
+	// admin can still GET → 200
+	w = do(t, adminRouter, http.MethodGet, "/v1/releases/"+id, nil)
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestReleases_Delete_NonOwnerReturns403(t *testing.T) {
+	s := testStore(t)
+	applier := &fakeK8sApplier{}
+
+	adminRouter := api.NewRouter(config.Config{}, api.Deps{
+		Verifier: adminVerifier{}, Store: s,
+		K8sFactory: &fakeK8sFactory{applier: applier},
+	})
+	clusterName := seedCluster(t, adminRouter)
+	tplName := seedPublishedTemplate(t, adminRouter)
+
+	relName := "nodelete-" + randSuffix()
+	body, _ := json.Marshal(map[string]any{
+		"template": tplName, "version": 1,
+		"cluster": clusterName, "namespace": "default",
+		"name": relName, "values": map[string]any{"Deployment[web].spec.replicas": 1},
+	})
+	w := do(t, adminRouter, http.MethodPost, "/v1/releases", bytes.NewReader(body))
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	var created map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &created))
+	id := created["id"].(string)
+
+	// non-admin user tries to DELETE → 403
+	userRouter := newTestRouterUserWithK8s(t, s, applier)
+	w = do(t, userRouter, http.MethodDelete, "/v1/releases/"+id, nil)
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "not the release owner")
+}
+
+func TestReleases_Create_InvalidNameReturns400(t *testing.T) {
+	r, _ := newTestRouterWithK8s(t)
+	clusterName := seedCluster(t, r)
+	tplName := seedPublishedTemplate(t, r)
+
+	body, _ := json.Marshal(map[string]any{
+		"template":  tplName,
+		"version":   1,
+		"cluster":   clusterName,
+		"namespace": "default",
+		"name":      "INVALID_NAME!",
+		"values":    map[string]any{"Deployment[web].spec.replicas": 1},
+	})
+	w := do(t, r, http.MethodPost, "/v1/releases", bytes.NewReader(body))
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Contains(t, w.Body.String(), "validation-error")
 }
 
 func TestReleases_Create_UnpublishedReturns409(t *testing.T) {

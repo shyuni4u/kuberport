@@ -18,8 +18,34 @@ type createReleaseReq struct {
 	Version   int             `json:"version"   binding:"required,min=1"`
 	Cluster   string          `json:"cluster"   binding:"required"`
 	Namespace string          `json:"namespace" binding:"required"`
-	Name      string          `json:"name"      binding:"required"`
+	Name      string          `json:"name"      binding:"required,hostname_rfc1123"`
 	Values    json.RawMessage `json:"values"    binding:"required"`
+}
+
+// resolveUser upserts the authenticated user and returns the DB record.
+func (h *Handlers) resolveUser(c *gin.Context) (store.User, bool) {
+	u, _ := auth.UserFrom(c.Request.Context())
+	user, err := h.deps.Store.UpsertUser(c.Request.Context(), store.UpsertUserParams{
+		OidcSubject: u.Subject,
+		Email:       store.PgText(u.Email),
+		DisplayName: store.PgText(u.Name),
+	})
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+		return store.User{}, false
+	}
+	return user, true
+}
+
+// isAdmin returns true if the authenticated user belongs to kuberport-admin.
+func isAdmin(c *gin.Context) bool {
+	u, _ := auth.UserFrom(c.Request.Context())
+	for _, g := range u.Groups {
+		if g == "kuberport-admin" {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Handlers) CreateRelease(c *gin.Context) {
@@ -54,7 +80,7 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 		ReleaseName:     r.Name,
 		TemplateName:    r.Template,
 		TemplateVersion: r.Version,
-		ReleaseID:       r.Name, // use release name as ID for label; DB ID not yet known
+		ReleaseID:       r.Name,
 		AppliedBy:       u.Email,
 	})
 	if err != nil {
@@ -62,13 +88,8 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 		return
 	}
 
-	user, err := h.deps.Store.UpsertUser(ctx, store.UpsertUserParams{
-		OidcSubject: u.Subject,
-		Email:       store.PgText(u.Email),
-		DisplayName: store.PgText(u.Name),
-	})
-	if err != nil {
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+	user, ok := h.resolveUser(c)
+	if !ok {
 		return
 	}
 
@@ -94,6 +115,7 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 		return
 	}
 	if err := cli.ApplyAll(ctx, r.Namespace, rendered); err != nil {
+		_ = h.deps.Store.DeleteRelease(ctx, rel.ID)
 		writeError(c, http.StatusBadGateway, "k8s-error", err.Error())
 		return
 	}
@@ -102,18 +124,24 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 
 func (h *Handlers) ListReleases(c *gin.Context) {
 	ctx := c.Request.Context()
-	u, _ := auth.UserFrom(ctx)
 
-	user, err := h.deps.Store.UpsertUser(ctx, store.UpsertUserParams{
-		OidcSubject: u.Subject,
-		Email:       store.PgText(u.Email),
-		DisplayName: store.PgText(u.Name),
-	})
-	if err != nil {
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+	if isAdmin(c) {
+		rows, err := h.deps.Store.ListAllReleases(ctx)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
+		if rows == nil {
+			rows = []store.ListAllReleasesRow{}
+		}
+		c.JSON(http.StatusOK, gin.H{"releases": rows})
 		return
 	}
 
+	user, ok := h.resolveUser(c)
+	if !ok {
+		return
+	}
 	rows, err := h.deps.Store.ListReleasesForUser(ctx, user.ID)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())
@@ -131,11 +159,24 @@ func (h *Handlers) GetRelease(c *gin.Context) {
 		writeError(c, http.StatusBadRequest, "validation-error", "invalid release id")
 		return
 	}
-	rel, err := h.deps.Store.GetReleaseByID(c.Request.Context(), id)
+	ctx := c.Request.Context()
+	rel, err := h.deps.Store.GetReleaseByID(ctx, id)
 	if err != nil {
 		writeError(c, http.StatusNotFound, "not-found", "release")
 		return
 	}
+
+	if !isAdmin(c) {
+		user, ok := h.resolveUser(c)
+		if !ok {
+			return
+		}
+		if rel.CreatedByUserID != user.ID {
+			writeError(c, http.StatusForbidden, "rbac-denied", "not the release owner")
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, rel)
 }
 
@@ -152,6 +193,17 @@ func (h *Handlers) DeleteRelease(c *gin.Context) {
 	if err != nil {
 		writeError(c, http.StatusNotFound, "not-found", "release")
 		return
+	}
+
+	if !isAdmin(c) {
+		user, ok := h.resolveUser(c)
+		if !ok {
+			return
+		}
+		if rel.CreatedByUserID != user.ID {
+			writeError(c, http.StatusForbidden, "rbac-denied", "not the release owner")
+			return
+		}
 	}
 
 	cli, err := h.deps.K8sFactory.NewWithToken(rel.ClusterApiUrl, rel.ClusterCaBundle.String, u.IDToken)

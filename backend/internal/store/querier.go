@@ -24,6 +24,7 @@ type Querier interface {
 	InsertRelease(ctx context.Context, arg InsertReleaseParams) (Release, error)
 	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
 	InsertTemplateVersion(ctx context.Context, arg InsertTemplateVersionParams) (TemplateVersion, error)
+	ListAllReleases(ctx context.Context) ([]ListAllReleasesRow, error)
 	ListClusters(ctx context.Context) ([]Cluster, error)
 	ListReleasesForUser(ctx context.Context, createdByUserID pgtype.UUID) ([]ListReleasesForUserRow, error)
 	ListTemplateVersions(ctx context.Context, name string) ([]TemplateVersion, error)
