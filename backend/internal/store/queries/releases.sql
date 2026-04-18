@@ -1,19 +1,25 @@
 -- name: ListReleasesForUser :many
-SELECT r.*, c.name AS cluster_name, t.name AS template_name, tv.version AS template_version
+SELECT r.id, r.name, r.template_version_id, r.cluster_id, r.namespace,
+       r.created_by_user_id, r.created_at, r.updated_at,
+       c.name AS cluster_name, t.name AS template_name, tv.version AS template_version
   FROM releases r
   JOIN clusters c          ON c.id = r.cluster_id
   JOIN template_versions tv ON tv.id = r.template_version_id
   JOIN templates t         ON t.id = tv.template_id
  WHERE r.created_by_user_id = $1
- ORDER BY r.created_at DESC;
+ ORDER BY r.created_at DESC
+ LIMIT $2 OFFSET $3;
 
 -- name: ListAllReleases :many
-SELECT r.*, c.name AS cluster_name, t.name AS template_name, tv.version AS template_version
+SELECT r.id, r.name, r.template_version_id, r.cluster_id, r.namespace,
+       r.created_by_user_id, r.created_at, r.updated_at,
+       c.name AS cluster_name, t.name AS template_name, tv.version AS template_version
   FROM releases r
   JOIN clusters c          ON c.id = r.cluster_id
   JOIN template_versions tv ON tv.id = r.template_version_id
   JOIN templates t         ON t.id = tv.template_id
- ORDER BY r.created_at DESC;
+ ORDER BY r.created_at DESC
+ LIMIT $1 OFFSET $2;
 
 -- name: GetReleaseByID :one
 SELECT r.*, c.name AS cluster_name, c.api_url AS cluster_api_url, c.ca_bundle AS cluster_ca_bundle,

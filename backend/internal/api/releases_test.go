@@ -247,6 +247,43 @@ func TestReleases_Delete_NonOwnerReturns403(t *testing.T) {
 	require.Contains(t, w.Body.String(), "not the release owner")
 }
 
+func TestReleases_List_NonAdminSeesOnlyOwn(t *testing.T) {
+	s := testStore(t)
+	applier := &fakeK8sApplier{}
+
+	// admin creates a release
+	adminRouter := api.NewRouter(config.Config{}, api.Deps{
+		Verifier: adminVerifier{}, Store: s,
+		K8sFactory: &fakeK8sFactory{applier: applier},
+	})
+	clusterName := seedCluster(t, adminRouter)
+	tplName := seedPublishedTemplate(t, adminRouter)
+
+	body, _ := json.Marshal(map[string]any{
+		"template": tplName, "version": 1,
+		"cluster": clusterName, "namespace": "default",
+		"name": "admin-rel-" + randSuffix(),
+		"values": map[string]any{"Deployment[web].spec.replicas": 1},
+	})
+	w := do(t, adminRouter, http.MethodPost, "/v1/releases", bytes.NewReader(body))
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	// admin list → sees the release
+	w = do(t, adminRouter, http.MethodGet, "/v1/releases", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	var adminList map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &adminList))
+	require.NotEmpty(t, adminList["releases"])
+
+	// non-admin list → sees 0 releases (different user)
+	userRouter := newTestRouterUserWithK8s(t, s, applier)
+	w = do(t, userRouter, http.MethodGet, "/v1/releases", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	var userList map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &userList))
+	require.Empty(t, userList["releases"])
+}
+
 func TestReleases_Create_InvalidNameReturns400(t *testing.T) {
 	r, _ := newTestRouterWithK8s(t)
 	clusterName := seedCluster(t, r)

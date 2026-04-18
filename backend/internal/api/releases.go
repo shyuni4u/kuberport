@@ -3,17 +3,22 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"kuberport/internal/auth"
 	"kuberport/internal/store"
 	"kuberport/internal/template"
 )
+
+const defaultPageLimit = 50
 
 type createReleaseReq struct {
 	Template  string          `json:"template"  binding:"required"`
@@ -25,6 +30,9 @@ type createReleaseReq struct {
 }
 
 // resolveUser upserts the authenticated user and returns the DB record.
+// NOTE: This does NOT participate in a database transaction. Callers inside
+// Store.WithTx blocks (e.g. CreateTemplate) should use the transactional
+// Queries directly instead of this helper.
 func (h *Handlers) resolveUser(c *gin.Context) (store.User, bool) {
 	u, _ := auth.UserFrom(c.Request.Context())
 	user, err := h.deps.Store.UpsertUser(c.Request.Context(), store.UpsertUserParams{
@@ -48,6 +56,22 @@ func isAdmin(c *gin.Context) bool {
 		}
 	}
 	return false
+}
+
+// parsePagination extracts limit/offset from query params with defaults.
+func parsePagination(c *gin.Context) (limit, offset int32) {
+	limit = defaultPageLimit
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 32); err == nil && n > 0 && n <= 200 {
+			limit = int32(n)
+		}
+	}
+	if v := c.Query("offset"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 32); err == nil && n >= 0 {
+			offset = int32(n)
+		}
+	}
+	return
 }
 
 func (h *Handlers) CreateRelease(c *gin.Context) {
@@ -78,6 +102,9 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 		return
 	}
 
+	// ReleaseID uses r.Name rather than DB UUID because the UUID is not known
+	// until after INSERT. The release name is unique within (cluster, namespace)
+	// and is used as the kuberport.io/release label for k8s resource tracking.
 	rendered, err := template.Render(tv.ResourcesYaml, tv.UiSpecYaml, r.Values, template.Labels{
 		ReleaseName:     r.Name,
 		TemplateName:    r.Template,
@@ -105,7 +132,13 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 		CreatedByUserID:   user.ID,
 	})
 	if err != nil {
-		writeError(c, http.StatusConflict, "conflict", err.Error())
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			writeError(c, http.StatusConflict, "conflict", "release name already exists in this cluster/namespace")
+			return
+		}
+		log.Printf("InsertRelease error: %v", err)
+		writeError(c, http.StatusInternalServerError, "internal", "failed to create release")
 		return
 	}
 
@@ -136,9 +169,12 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 
 func (h *Handlers) ListReleases(c *gin.Context) {
 	ctx := c.Request.Context()
+	limit, offset := parsePagination(c)
 
 	if isAdmin(c) {
-		rows, err := h.deps.Store.ListAllReleases(ctx)
+		rows, err := h.deps.Store.ListAllReleases(ctx, store.ListAllReleasesParams{
+			Limit: limit, Offset: offset,
+		})
 		if err != nil {
 			writeError(c, http.StatusInternalServerError, "internal", err.Error())
 			return
@@ -154,7 +190,9 @@ func (h *Handlers) ListReleases(c *gin.Context) {
 	if !ok {
 		return
 	}
-	rows, err := h.deps.Store.ListReleasesForUser(ctx, user.ID)
+	rows, err := h.deps.Store.ListReleasesForUser(ctx, store.ListReleasesForUserParams{
+		CreatedByUserID: user.ID, Limit: limit, Offset: offset,
+	})
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
