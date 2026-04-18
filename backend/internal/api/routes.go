@@ -49,6 +49,7 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 	v.POST("/clusters/:name/openapi/refresh", h.RefreshOpenAPI)
 	v.GET("/templates", h.ListTemplates)
 	v.POST("/templates", requireAdmin(), h.CreateTemplate)
+	v.POST("/templates/preview", h.PreviewTemplate)
 	v.GET("/templates/:name", h.GetTemplate)
 	v.GET("/templates/:name/versions", h.ListTemplateVersions)
 	v.GET("/templates/:name/versions/:v", h.GetTemplateVersion)
