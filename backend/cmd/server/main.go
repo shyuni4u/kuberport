@@ -8,8 +8,21 @@ import (
 	"kuberport/internal/api"
 	"kuberport/internal/auth"
 	"kuberport/internal/config"
+	"kuberport/internal/k8s"
 	"kuberport/internal/store"
 )
+
+// k8sFactory adapts the k8s package constructors to api.K8sClientFactory.
+// Falls back to insecure TLS when no CA bundle is registered for the cluster
+// (local dev / kind). Production clusters must register a CA bundle.
+type k8sFactory struct{}
+
+func (k8sFactory) NewWithToken(apiURL, caBundle, bearer string) (api.K8sApplier, error) {
+	if caBundle == "" {
+		return k8s.NewInsecureWithToken(apiURL, bearer)
+	}
+	return k8s.NewWithToken(apiURL, caBundle, bearer)
+}
 
 func main() {
 	cfg := config.Config{
@@ -38,7 +51,7 @@ func main() {
 	}
 	defer st.Close()
 
-	r := api.NewRouter(cfg, api.Deps{Verifier: verifier, Store: st})
+	r := api.NewRouter(cfg, api.Deps{Verifier: verifier, Store: st, K8sFactory: k8sFactory{}})
 	log.Printf("listening on %s", cfg.ListenAddr)
 	if err := r.Run(cfg.ListenAddr); err != nil {
 		log.Fatal(err)
