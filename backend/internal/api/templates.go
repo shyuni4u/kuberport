@@ -79,15 +79,6 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	u, _ := auth.UserFrom(ctx)
-	user, err := h.deps.Store.UpsertUser(ctx, store.UpsertUserParams{
-		OidcSubject: u.Subject,
-		Email:       store.PgText(u.Email),
-		DisplayName: store.PgText(u.Name),
-	})
-	if err != nil {
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
 
 	var owning pgtype.UUID
 	if r.OwningTeamID != "" {
@@ -99,13 +90,50 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 		owning = pgtype.UUID{Bytes: parsed, Valid: true}
 	}
 
-	tpl, err := h.deps.Store.InsertTemplateV2(ctx, store.InsertTemplateV2Params{
-		Name:         r.Name,
-		DisplayName:  r.DisplayName,
-		Description:  store.PgText(r.Description),
-		Tags:         r.Tags,
-		OwnerUserID:  user.ID,
-		OwningTeamID: owning,
+	var uiStateJSON []byte
+	if r.UIState != nil {
+		b, _ := json.Marshal(r.UIState)
+		uiStateJSON = b
+	}
+
+	var user store.User
+	var tpl store.Template
+	var ver store.TemplateVersion
+	err := h.deps.Store.WithTx(ctx, func(q *store.Queries) error {
+		var err error
+		user, err = q.UpsertUser(ctx, store.UpsertUserParams{
+			OidcSubject: u.Subject,
+			Email:       store.PgText(u.Email),
+			DisplayName: store.PgText(u.Name),
+		})
+		if err != nil {
+			return err
+		}
+
+		tpl, err = q.InsertTemplateV2(ctx, store.InsertTemplateV2Params{
+			Name:         r.Name,
+			DisplayName:  r.DisplayName,
+			Description:  store.PgText(r.Description),
+			Tags:         r.Tags,
+			OwnerUserID:  user.ID,
+			OwningTeamID: owning,
+		})
+		if err != nil {
+			return err
+		}
+
+		ver, err = q.InsertTemplateVersionV2(ctx, store.InsertTemplateVersionV2Params{
+			TemplateID:      tpl.ID,
+			Version:         1,
+			ResourcesYaml:   r.ResourcesYAML,
+			UiSpecYaml:      r.UISpecYAML,
+			MetadataYaml:    store.PgText(r.MetadataYAML),
+			Status:          "draft",
+			CreatedByUserID: user.ID,
+			AuthoringMode:   r.AuthoringMode,
+			UiStateJson:     uiStateJSON,
+		})
+		return err
 	})
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -114,28 +142,6 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 			return
 		}
 		writeError(c, http.StatusConflict, "conflict", err.Error())
-		return
-	}
-
-	var uiStateJSON []byte
-	if r.UIState != nil {
-		b, _ := json.Marshal(r.UIState)
-		uiStateJSON = b
-	}
-
-	ver, err := h.deps.Store.InsertTemplateVersionV2(ctx, store.InsertTemplateVersionV2Params{
-		TemplateID:      tpl.ID,
-		Version:         1,
-		ResourcesYaml:   r.ResourcesYAML,
-		UiSpecYaml:      r.UISpecYAML,
-		MetadataYaml:    store.PgText(r.MetadataYAML),
-		Status:          "draft",
-		CreatedByUserID: user.ID,
-		AuthoringMode:   r.AuthoringMode,
-		UiStateJson:     uiStateJSON,
-	})
-	if err != nil {
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 
