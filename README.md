@@ -5,7 +5,7 @@
 > Template-driven self-service portal for Kubernetes.
 > Admins publish YAML + ui-spec templates; non-experts deploy and operate via abstracted forms.
 
-**Status:** early development — the [design spec](docs/superpowers/specs/2026-04-16-initial-design.md) is approved and Plan 1 (vertical slice) is ready to execute. No runtime code has been merged yet.
+**Status:** Plan 1 (vertical slice) shipped. You can log in, register a cluster, publish a YAML-mode template, and deploy it. Plan 2 (Admin UX) is in the design phase; Plan 3 (User observability) is not written yet.
 
 ---
 
@@ -90,7 +90,7 @@ pnpm install && pnpm dev
 # 5. Open http://localhost:3000 and log in as alice / alice
 ```
 
-Plan 1 is now in-progress — `backend/` and `frontend/` are scaffolded. See [the plan](docs/superpowers/plans/2026-04-16-mvp-1-vertical-slice.md) for the task-by-task status.
+For a full browser → deploy-to-kind walkthrough — self-signed dex cert, Windows hosts gotchas, the whole OIDC story — see [docs/local-e2e.md](docs/local-e2e.md). The quick start above is enough for backend + frontend + DB; e2e against a real k8s cluster needs a few more knobs.
 
 ## Running tests
 
@@ -98,7 +98,7 @@ Plan 1 is now in-progress — `backend/` and `frontend/` are scaffolded. See [th
 # Unit + integration (compose must be up; see backend/CLAUDE.md)
 make test                      # equivalent: cd backend && go test ./...
 
-# End-to-end happy path (requires a kind cluster; see Task 22 in the plan)
+# End-to-end happy path (requires a kind cluster — see docs/local-e2e.md)
 export KBP_KIND_API=https://127.0.0.1:6443
 make e2e
 ```
@@ -117,8 +117,8 @@ Work is split into three plans that each ship usable software:
 
 | # | Plan | Ships | Link |
 |---|------|-------|------|
-| 1 | **Vertical slice** | OIDC login, YAML-mode template CRUD, deploy form, release list & overview | [plan](docs/superpowers/plans/2026-04-16-mvp-1-vertical-slice.md) |
-| 2 | **Admin UX** | UI-mode editor (tree + meta + live preview), publish/deprecate, version history | *(not written yet — follows after Plan 1 execution)* |
+| 1 | **Vertical slice** | OIDC login, YAML-mode template CRUD, deploy form, release list & overview | [plan](docs/superpowers/plans/2026-04-16-mvp-1-vertical-slice.md) ✅ |
+| 2 | **Admin UX** | UI-mode editor (tree + meta + live preview), publish/deprecate, version history | *(brainstorming → spec → plan)* |
 | 3 | **User observability** | Release logs (SSE), events, settings tabs, update-available migration, Helm chart for self-hosting | *(not written yet)* |
 
 Deferred beyond the MVP: CRD support, Git-backed templates, team/RBAC UI, Helm chart import, release history.
@@ -149,7 +149,7 @@ kuberport/
 
 ## Contributing
 
-Not yet open to outside contributions — the shape of the system is still stabilizing. Once Plan 1 merges, issues and PRs will be welcome.
+Not yet open to outside contributions — the shape of the system is still stabilizing. Issues and PRs will be welcome once Plan 2 is scoped and merged.
 
 ## License
 
