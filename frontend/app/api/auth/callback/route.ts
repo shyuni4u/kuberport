@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   }
   const { state, nonce, verifier } = parsed;
 
-  const tokens = await client.authorizationCodeGrant(config, req.nextUrl, {
+  const tokens = await client.authorizationCodeGrant(config, new URL(req.url), {
     pkceCodeVerifier: verifier,
     expectedState: state,
     expectedNonce: nonce,

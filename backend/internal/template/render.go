@@ -106,13 +106,37 @@ func marshalMultiDoc(docs []map[string]any) ([]byte, error) {
 
 func stampLabels(obj map[string]any, l Labels) {
 	meta := ensureMap(obj, "metadata")
+	stampLabelsOnto(meta, l)
+	anns := ensureMap(meta, "annotations")
+	anns["kuberport.io/release-id"] = l.ReleaseID
+	anns["kuberport.io/applied-by"] = l.AppliedBy
+	anns["kuberport.io/applied-at"] = time.Now().UTC().Format(time.RFC3339)
+
+	// Propagate labels to pod template metadata so runtime pods carry
+	// kuberport.io/release — otherwise release status (which queries pods by
+	// this label) returns 0 instances even when the Deployment is healthy.
+	if spec, ok := obj["spec"].(map[string]any); ok {
+		if tmpl, ok := spec["template"].(map[string]any); ok {
+			stampLabelsOnto(ensureMap(tmpl, "metadata"), l)
+		}
+		// CronJob nests pod template under spec.jobTemplate.spec.template
+		if jobTmpl, ok := spec["jobTemplate"].(map[string]any); ok {
+			if jobSpec, ok := jobTmpl["spec"].(map[string]any); ok {
+				if tmpl, ok := jobSpec["template"].(map[string]any); ok {
+					stampLabelsOnto(ensureMap(tmpl, "metadata"), l)
+				}
+			}
+		}
+	}
+}
+
+// stampLabelsOnto writes kuberport-owned labels into meta. Reserved keys under
+// the kuberport.io/ prefix intentionally overwrite any user-provided values —
+// templates should not try to set these themselves.
+func stampLabelsOnto(meta map[string]any, l Labels) {
 	lbls := ensureMap(meta, "labels")
 	lbls["kuberport.io/managed"] = "true"
 	lbls["kuberport.io/release"] = l.ReleaseName
 	lbls["kuberport.io/template"] = l.TemplateName
 	lbls["kuberport.io/template-version"] = fmt.Sprintf("%d", l.TemplateVersion)
-	anns := ensureMap(meta, "annotations")
-	anns["kuberport.io/release-id"] = l.ReleaseID
-	anns["kuberport.io/applied-by"] = l.AppliedBy
-	anns["kuberport.io/applied-at"] = time.Now().UTC().Format(time.RFC3339)
 }
