@@ -101,6 +101,28 @@ func (h *Handlers) ListTeamMembers(c *gin.Context) {
 	if !ok {
 		return
 	}
+	u, _ := auth.UserFrom(c.Request.Context())
+
+	// Admin can list any team. Non-admins must be members of the target team.
+	if !isKuberportAdmin(u) {
+		caller, err := h.deps.Store.UpsertUser(c, store.UpsertUserParams{
+			OidcSubject: u.Subject,
+			Email:       store.PgText(u.Email),
+			DisplayName: store.PgText(u.Name),
+		})
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
+		if _, err := h.deps.Store.GetTeamMembership(c, store.GetTeamMembershipParams{
+			TeamID: tid,
+			UserID: caller.ID,
+		}); err != nil {
+			writeError(c, http.StatusForbidden, "rbac-denied", "team member or kuberport-admin required")
+			return
+		}
+	}
+
 	members, err := h.deps.Store.ListTeamMembers(c, tid)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())

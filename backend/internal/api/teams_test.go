@@ -163,3 +163,47 @@ type customVerifier struct {
 func (v customVerifier) Verify(_ context.Context, _ string) (auth.Claims, error) {
 	return v.claims, nil
 }
+
+func TestTeams_Members_ListRequiresMembershipOrAdmin(t *testing.T) {
+	s := testStore(t)
+	suffix := randSuffix()
+
+	// Create alice with a unique email
+	aliceEmail := "alice-" + suffix + "@example.com"
+	_, err := s.UpsertUser(context.Background(), store.UpsertUserParams{
+		OidcSubject: "alice-" + suffix,
+		Email:       store.PgText(aliceEmail),
+		DisplayName: store.PgText("Alice"),
+	})
+	require.NoError(t, err)
+
+	adminR := api.NewRouter(config.Config{}, api.Deps{Verifier: adminVerifier{}, Store: s})
+	aliceVerifier := customVerifier{claims: auth.Claims{Subject: "alice-" + suffix, Email: aliceEmail}}
+	userR := api.NewRouter(config.Config{}, api.Deps{Verifier: aliceVerifier, Store: s})
+
+	// Create team as admin; alice is NOT added
+	teamName := "priv-" + suffix
+	w := do(t, adminR, http.MethodPost, "/v1/teams",
+		bytes.NewReader([]byte(`{"name":"`+teamName+`"}`)))
+	require.Equal(t, http.StatusCreated, w.Code)
+	var tm map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &tm)
+	tid := tm["id"].(string)
+
+	// Non-member alice → 403
+	w = do(t, userR, http.MethodGet, "/v1/teams/"+tid+"/members", nil)
+	require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+
+	// Admin → 200
+	w = do(t, adminR, http.MethodGet, "/v1/teams/"+tid+"/members", nil)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// Add alice as viewer
+	w = do(t, adminR, http.MethodPost, "/v1/teams/"+tid+"/members",
+		bytes.NewReader([]byte(`{"email":"`+aliceEmail+`","role":"viewer"}`)))
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+
+	// Now alice should be able to list
+	w = do(t, userR, http.MethodGet, "/v1/teams/"+tid+"/members", nil)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
