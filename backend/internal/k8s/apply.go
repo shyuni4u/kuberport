@@ -23,12 +23,20 @@ func (c *Client) ApplyAll(ctx context.Context, namespace string, multiDoc []byte
 	if err != nil {
 		return fmt.Errorf("split yaml: %w", err)
 	}
-	var errs []error
+	errs := make([]error, 0, len(objs))
 	for _, o := range objs {
+		if err := ctx.Err(); err != nil {
+			errs = append(errs, err)
+			break
+		}
 		gvk := o.GroupVersionKind()
 		plural := pluralize(gvk.Kind)
 		if plural == "" {
 			errs = append(errs, fmt.Errorf("unsupported kind %q (MVP supports §12.1 only)", gvk.Kind))
+			continue
+		}
+		if o.GetName() == "" {
+			errs = append(errs, fmt.Errorf("object %s is missing metadata.name", gvk.Kind))
 			continue
 		}
 		gvr := schema.GroupVersionResource{
