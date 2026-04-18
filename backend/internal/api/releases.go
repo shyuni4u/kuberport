@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"kuberport/internal/auth"
+	"kuberport/internal/k8s"
 	"kuberport/internal/store"
 	"kuberport/internal/template"
 )
@@ -231,7 +232,69 @@ func (h *Handlers) GetRelease(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, rel)
+	u, _ := auth.UserFrom(ctx)
+	cli, err := h.deps.K8sFactory.NewWithToken(rel.ClusterApiUrl, rel.ClusterCaBundle.String, u.IDToken)
+	if err != nil {
+		respondReleaseOverview(c, rel, nil)
+		return
+	}
+
+	instances, err := cli.ListInstances(ctx, rel.Namespace, rel.Name)
+	if err != nil {
+		respondReleaseOverview(c, rel, nil)
+		return
+	}
+
+	respondReleaseOverview(c, rel, instances)
+}
+
+// respondReleaseOverview writes the release detail response.
+// If instances is nil, status is "unknown" (k8s unavailable).
+func respondReleaseOverview(c *gin.Context, rel store.GetReleaseByIDRow, instances []k8s.Instance) {
+	ready := 0
+	for _, i := range instances {
+		if i.Ready {
+			ready++
+		}
+	}
+	status := abstractStatus(instances)
+	c.JSON(http.StatusOK, gin.H{
+		"id": rel.ID, "name": rel.Name,
+		"template":        gin.H{"name": rel.TemplateName, "version": rel.TemplateVersion},
+		"cluster":         rel.ClusterName,
+		"namespace":       rel.Namespace,
+		"values_json":     rel.ValuesJson,
+		"rendered_yaml":   rel.RenderedYaml,
+		"instances_total": len(instances),
+		"instances_ready": ready,
+		"instances":       instances,
+		"status":          status,
+		"created_at":      rel.CreatedAt,
+	})
+}
+
+// abstractStatus derives a summary status from pod instances.
+func abstractStatus(instances []k8s.Instance) string {
+	if len(instances) == 0 {
+		return "unknown"
+	}
+	allReady := true
+	hasError := false
+	for _, i := range instances {
+		if !i.Ready {
+			allReady = false
+		}
+		if i.Phase == "Failed" || i.Restarts > 5 {
+			hasError = true
+		}
+	}
+	if hasError {
+		return "error"
+	}
+	if allReady {
+		return "healthy"
+	}
+	return "warning"
 }
 
 func (h *Handlers) DeleteRelease(c *gin.Context) {
