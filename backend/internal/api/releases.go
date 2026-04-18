@@ -286,7 +286,7 @@ func abstractStatus(instances []k8s.Instance) string {
 	allReady := true
 	hasError := false
 	for _, i := range instances {
-		if !i.Ready {
+		if !i.Ready && i.Phase != "Succeeded" {
 			allReady = false
 		}
 		if i.Phase == "Failed" || i.Restarts > maxRestartsBeforeError {

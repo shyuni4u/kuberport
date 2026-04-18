@@ -57,22 +57,24 @@ func allContainersReady(status map[string]any) bool {
 	return false
 }
 
-// totalRestarts sums restartCount across all container statuses.
+// totalRestarts sums restartCount across container and init container statuses.
 func totalRestarts(status map[string]any) int32 {
-	statuses, ok := status["containerStatuses"].([]any)
-	if !ok {
-		return 0
-	}
 	var total int32
-	for _, s := range statuses {
-		cs, ok := s.(map[string]any)
+	for _, key := range []string{"containerStatuses", "initContainerStatuses"} {
+		statuses, ok := status[key].([]any)
 		if !ok {
 			continue
 		}
-		if rc, ok := cs["restartCount"].(int64); ok {
-			total += int32(rc)
-		} else if rc, ok := cs["restartCount"].(float64); ok {
-			total += int32(rc)
+		for _, s := range statuses {
+			cs, ok := s.(map[string]any)
+			if !ok {
+				continue
+			}
+			if rc, ok := cs["restartCount"].(int64); ok {
+				total += int32(rc)
+			} else if rc, ok := cs["restartCount"].(float64); ok {
+				total += int32(rc)
+			}
 		}
 	}
 	return total
