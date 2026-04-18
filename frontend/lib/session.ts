@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { pool } from "./db";
+import { getConfig, client } from "./oidc";
 import crypto from "node:crypto";
 
 const COOKIE = "kbp_sid";
@@ -13,7 +14,15 @@ export interface Session {
 }
 
 function getKey(): Buffer {
-  return Buffer.from(process.env.APP_ENCRYPTION_KEY_B64!, "base64");
+  const raw = process.env.APP_ENCRYPTION_KEY_B64;
+  if (!raw) throw new Error("APP_ENCRYPTION_KEY_B64 is not set");
+  const key = Buffer.from(raw, "base64");
+  if (key.length !== 32) {
+    throw new Error(
+      `APP_ENCRYPTION_KEY_B64 must decode to 32 bytes (got ${key.length})`,
+    );
+  }
+  return key;
 }
 
 function encrypt(plain: string): string {
@@ -111,4 +120,38 @@ export async function destroySession() {
   const id = cookieStore.get(COOKIE)?.value;
   if (id) await pool.query("DELETE FROM sessions WHERE id=$1", [id]);
   cookieStore.delete(COOKIE);
+}
+
+/**
+ * Returns a valid id_token for the session, refreshing if it's within 60s of expiring.
+ * Returns null if the session is already expired and refresh fails — caller should 401.
+ */
+export async function getValidToken(
+  session: Session,
+): Promise<string | null> {
+  if (session.idTokenExp.getTime() > Date.now() + 60_000) {
+    return session.idToken;
+  }
+  if (!session.refreshToken) return null;
+
+  try {
+    const config = await getConfig();
+    const tokens = await client.refreshTokenGrant(config, session.refreshToken);
+    if (!tokens.id_token) return null;
+
+    const exp = tokens.expiresIn()
+      ? new Date(Date.now() + tokens.expiresIn()! * 1000)
+      : new Date(Date.now() + 3600 * 1000);
+
+    await updateSessionTokens(
+      session.id,
+      tokens.id_token,
+      tokens.refresh_token ?? session.refreshToken,
+      exp,
+    );
+    return tokens.id_token;
+  } catch {
+    await pool.query("DELETE FROM sessions WHERE id=$1", [session.id]);
+    return null;
+  }
 }

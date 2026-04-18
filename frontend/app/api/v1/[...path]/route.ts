@@ -1,27 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, updateSessionTokens } from "@/lib/session";
-import { getConfig, client } from "@/lib/oidc";
+import { getSession, getValidToken } from "@/lib/session";
 
-import type { Session } from "@/lib/session";
+const STRIPPED_RESPONSE_HEADERS = new Set([
+  "content-encoding",
+  "content-length",
+  "transfer-encoding",
+  "connection",
+  "keep-alive",
+  "set-cookie",
+]);
 
-async function getValidToken(session: Session): Promise<string | null> {
-  if (session.idTokenExp.getTime() > Date.now() + 60_000) return session.idToken;
-  if (!session.refreshToken) return null;
-
-  const config = await getConfig();
-  const tokens = await client.refreshTokenGrant(config, session.refreshToken);
-
-  const exp = tokens.expiresIn()
-    ? new Date(Date.now() + tokens.expiresIn()! * 1000)
-    : new Date(Date.now() + 3600 * 1000);
-
-  await updateSessionTokens(
-    session.id,
-    tokens.id_token!,
-    tokens.refresh_token ?? session.refreshToken,
-    exp,
-  );
-  return tokens.id_token!;
+function filterUpstreamHeaders(upstream: Response): Headers {
+  const out = new Headers();
+  upstream.headers.forEach((value, key) => {
+    if (!STRIPPED_RESPONSE_HEADERS.has(key.toLowerCase())) {
+      out.set(key, value);
+    }
+  });
+  return out;
 }
 
 async function proxy(
@@ -53,7 +49,7 @@ async function proxy(
 
   return new NextResponse(upstream.body, {
     status: upstream.status,
-    headers: upstream.headers,
+    headers: filterUpstreamHeaders(upstream),
   });
 }
 

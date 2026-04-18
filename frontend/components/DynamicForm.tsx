@@ -44,10 +44,13 @@ function buildZodSchema(spec: UISpec) {
         s = z.boolean();
         break;
       case "enum":
+        if (!f.values || f.values.length === 0) {
+          throw new Error(`ui-spec field "${f.path}" is enum but has no values`);
+        }
         s = z.enum(f.values as [string, ...string[]]);
         break;
     }
-    shape[f.path] = f.required !== false ? s : s.optional();
+    shape[f.path] = f.required ? s : s.optional();
   }
   return z.object(shape);
 }
@@ -134,9 +137,7 @@ export function DynamicForm({
         <div key={f.path}>
           <label className="block text-sm font-medium text-slate-700 mb-1">
             {f.label}
-            {f.required !== false && (
-              <span className="text-red-500 ml-1">*</span>
-            )}
+            {f.required && <span className="text-red-500 ml-1">*</span>}
           </label>
           <Controller
             name={f.path}

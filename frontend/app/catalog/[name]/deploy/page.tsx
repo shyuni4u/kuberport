@@ -19,14 +19,23 @@ export default function DeployPage() {
 
   useEffect(() => {
     setCluster(localStorage.getItem("kbp_cluster") ?? "");
-    fetch(`/api/v1/templates/${name}`)
-      .then((r) => r.json())
-      .then((t) => {
+    (async () => {
+      try {
+        const tRes = await fetch(`/api/v1/templates/${name}`);
+        if (!tRes.ok) throw new Error(`템플릿 조회 실패: ${tRes.status}`);
+        const t = await tRes.json();
         setTemplate(t);
-        fetch(`/api/v1/templates/${name}/versions/${t.current_version}`)
-          .then((r) => r.json())
-          .then((v) => setSpec(YAML.parse(v.ui_spec_yaml)));
-      });
+
+        const vRes = await fetch(
+          `/api/v1/templates/${name}/versions/${t.current_version}`,
+        );
+        if (!vRes.ok) throw new Error(`버전 조회 실패: ${vRes.status}`);
+        const v = await vRes.json();
+        setSpec(YAML.parse(v.ui_spec_yaml));
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      }
+    })();
   }, [name]);
 
   async function submit(values: Record<string, unknown>) {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { apiFetch } from "@/lib/api-server";
 
 export default async function TemplateDetail({
@@ -15,9 +16,14 @@ export default async function TemplateDetail({
   async function publish(formData: FormData) {
     "use server";
     const version = formData.get("version") as string;
-    await apiFetch(`/v1/templates/${name}/versions/${version}/publish`, {
-      method: "POST",
-    });
+    const res = await apiFetch(
+      `/v1/templates/${name}/versions/${version}/publish`,
+      { method: "POST" },
+    );
+    if (!res.ok) {
+      throw new Error(`publish 실패: ${res.status} ${await res.text()}`);
+    }
+    revalidatePath(`/templates/${name}`);
   }
 
   return (

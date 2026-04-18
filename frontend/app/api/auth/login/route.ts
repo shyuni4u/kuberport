@@ -13,7 +13,13 @@ export async function GET() {
   cookieStore.set(
     "kbp_oidc_state",
     JSON.stringify({ state, nonce, verifier }),
-    { httpOnly: true, sameSite: "lax", path: "/", maxAge: 600 },
+    {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 600,
+    },
   );
 
   const url = client.buildAuthorizationUrl(config, {

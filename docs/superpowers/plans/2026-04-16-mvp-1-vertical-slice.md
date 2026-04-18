@@ -3621,7 +3621,7 @@ git commit -m "feat(frontend): catalog + DynamicForm + deploy flow"
 - Create: `frontend/components/ReleaseTable.tsx`
 - Create: `frontend/components/StatusBadge.tsx`
 
-- [ ] **Step 1: `StatusBadge` + `ReleaseTable`**
+- [x] **Step 1: `StatusBadge` + `ReleaseTable`**
 
 Path: `frontend/components/StatusBadge.tsx`
 ```tsx
@@ -3664,7 +3664,7 @@ export function ReleaseTable({ rows }: { rows: any[] }) {
 }
 ```
 
-- [ ] **Step 2: Release list page**
+- [x] **Step 2: Release list page**
 
 Path: `frontend/app/releases/page.tsx`
 ```tsx
@@ -3681,7 +3681,7 @@ export default async function ReleasesPage() {
 }
 ```
 
-- [ ] **Step 3: Release detail page**
+- [x] **Step 3: Release detail page**
 
 Path: `frontend/app/releases/[id]/page.tsx`
 ```tsx
@@ -3720,7 +3720,7 @@ function Card({ title, children }: any) {
 }
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/
