@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -81,7 +82,9 @@ func TestE2E_HappyPath(t *testing.T) {
 	require.NoError(t, exec.Command("docker", "compose",
 		"-f", "../../deploy/docker/docker-compose.yml", "up", "-d").Run())
 
-	// Start API server in background
+	// Start API server in background. `go run` spawns a child build+server process,
+	// so we set a process group and kill the whole group on teardown to avoid leaking
+	// the real server binary and leaving :8080 bound after the test exits.
 	cmd := exec.Command("go", "run", "../cmd/server")
 	cmd.Env = append(os.Environ(),
 		"LISTEN_ADDR=:8080",
@@ -89,13 +92,23 @@ func TestE2E_HappyPath(t *testing.T) {
 		"OIDC_ISSUER=http://localhost:5556",
 		"OIDC_AUDIENCE=kuberport",
 	)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	require.NoError(t, cmd.Start())
 	defer func() {
 		if cmd.Process != nil {
-			_ = cmd.Process.Kill()
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		}
 	}()
-	time.Sleep(2 * time.Second)
+
+	// Wait for the API to become ready by polling /healthz rather than a fixed sleep.
+	require.Eventually(t, func() bool {
+		r, err := http.Get(apiBase + "/healthz")
+		if err != nil {
+			return false
+		}
+		defer r.Body.Close()
+		return r.StatusCode == http.StatusOK
+	}, 30*time.Second, 200*time.Millisecond, "API did not become ready on :8080")
 
 	adminTok := fetchDexIDToken(t, "admin@example.com", "admin")
 	userTok := fetchDexIDToken(t, "alice@example.com", "alice")

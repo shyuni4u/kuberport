@@ -40,24 +40,28 @@ export default function DeployPage() {
 
   async function submit(values: Record<string, unknown>) {
     setErr(null);
-    const res = await fetch("/api/v1/releases", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        template: name,
-        version: (template as Record<string, unknown>)?.current_version,
-        cluster,
-        namespace,
-        name: releaseName,
-        values,
-      }),
-    });
-    if (!res.ok) {
-      setErr(await res.text());
-      return;
+    try {
+      const res = await fetch("/api/v1/releases", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          template: name,
+          version: (template as Record<string, unknown>)?.current_version,
+          cluster,
+          namespace,
+          name: releaseName,
+          values,
+        }),
+      });
+      if (!res.ok) {
+        setErr(await res.text());
+        return;
+      }
+      const d = await res.json();
+      router.push(`/releases/${d.id}`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
     }
-    const d = await res.json();
-    router.push(`/releases/${d.id}`);
   }
 
   if (!template || !spec) return <div>로딩 중…</div>;

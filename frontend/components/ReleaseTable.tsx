@@ -25,7 +25,7 @@ export function ReleaseTable({ rows }: { rows: ReleaseRow[] }) {
         {rows.map((r) => (
           <tr key={r.id} className="border-t">
             <td className="p-2">
-              <StatusBadge status={r.status ?? "—"} />
+              <StatusBadge status={r.status ?? "unknown"} />
             </td>
             <td className="p-2">
               <Link href={`/releases/${r.id}`} className="text-blue-600">
