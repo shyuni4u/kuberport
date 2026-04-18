@@ -69,6 +69,31 @@ func getDexToken(t *testing.T, client *http.Client) string {
 	return body.IDToken
 }
 
+func TestHTTPClientFromCAFile_MissingFile(t *testing.T) {
+	_, err := auth.HTTPClientFromCAFile("/nonexistent/path/to/ca.crt")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "read OIDC_CA_FILE")
+}
+
+func TestHTTPClientFromCAFile_MalformedPEM(t *testing.T) {
+	path := t.TempDir() + "/bad.crt"
+	require.NoError(t, os.WriteFile(path, []byte("not a pem\n"), 0o644))
+	_, err := auth.HTTPClientFromCAFile(path)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no certs parsed")
+}
+
+func TestHTTPClientFromCAFile_ValidPEMReturnsClient(t *testing.T) {
+	caPath := os.Getenv("OIDC_CA_FILE")
+	if caPath == "" {
+		t.Skip("OIDC_CA_FILE not set; requires deploy/docker/certs/dex.crt or equivalent")
+	}
+	c, err := auth.HTTPClientFromCAFile(caPath)
+	require.NoError(t, err)
+	require.NotNil(t, c)
+	require.NotNil(t, c.Transport)
+}
+
 func TestVerifier_Verify(t *testing.T) {
 	if os.Getenv("SKIP_OIDC") != "" {
 		t.Skip("SKIP_OIDC set")

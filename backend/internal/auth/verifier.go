@@ -46,6 +46,14 @@ func httpClientForIssuer() (*http.Client, error) {
 	if path == "" {
 		return nil, nil
 	}
+	return httpClientFromCAFile(path)
+}
+
+// httpClientFromCAFile builds an *http.Client that trusts the PEM-encoded CA at
+// path in addition to the system trust store. The transport is cloned from
+// http.DefaultTransport so timeouts / HTTP/2 / connection pool tuning are
+// inherited.
+func httpClientFromCAFile(path string) (*http.Client, error) {
 	pem, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read OIDC_CA_FILE: %w", err)
@@ -57,7 +65,9 @@ func httpClientForIssuer() (*http.Client, error) {
 	if !pool.AppendCertsFromPEM(pem) {
 		return nil, errors.New("OIDC_CA_FILE: no certs parsed")
 	}
-	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}}, nil
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.TLSClientConfig = &tls.Config{RootCAs: pool}
+	return &http.Client{Transport: tr}, nil
 }
 
 func (v *Verifier) Verify(ctx context.Context, rawToken string) (Claims, error) {

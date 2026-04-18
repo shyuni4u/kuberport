@@ -40,6 +40,10 @@ func main() {
 		log.Fatal("DATABASE_URL is required (local dev: postgres://kuberport:kuberport@localhost:5432/kuberport?sslmode=disable)")
 	}
 
+	if emails := os.Getenv("KBP_DEV_ADMIN_EMAILS"); emails != "" {
+		log.Printf("WARN: KBP_DEV_ADMIN_EMAILS is set, elevating %q to kuberport-admin — dev only, never set in production", emails)
+	}
+
 	ctx := context.Background()
 	verifier, err := auth.NewVerifier(ctx, cfg.OIDCIssuer, cfg.OIDCAudience)
 	if err != nil {

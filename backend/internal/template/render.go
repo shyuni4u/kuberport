@@ -130,6 +130,9 @@ func stampLabels(obj map[string]any, l Labels) {
 	}
 }
 
+// stampLabelsOnto writes kuberport-owned labels into meta. Reserved keys under
+// the kuberport.io/ prefix intentionally overwrite any user-provided values —
+// templates should not try to set these themselves.
 func stampLabelsOnto(meta map[string]any, l Labels) {
 	lbls := ensureMap(meta, "labels")
 	lbls["kuberport.io/managed"] = "true"

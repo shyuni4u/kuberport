@@ -159,6 +159,93 @@ func TestParseSpec_RejectsInvalidPatternEagerly(t *testing.T) {
 	require.Error(t, template.ValidateSpec(resourcesYAML, uiSpec))
 }
 
+func TestRender_StampsPodTemplateLabels(t *testing.T) {
+	values, _ := json.Marshal(map[string]any{})
+	out, err := template.Render(resourcesYAML, uiSpecYAML, values, template.Labels{
+		ReleaseName: "my-api", TemplateName: "web", TemplateVersion: 1,
+		ReleaseID: "rel_abc", AppliedBy: "alice@example.com",
+	})
+	require.NoError(t, err)
+
+	var docs []map[string]any
+	dec := yaml.NewDecoder(bytes.NewReader(out))
+	for {
+		m := map[string]any{}
+		if err := dec.Decode(&m); err != nil {
+			break
+		}
+		docs = append(docs, m)
+	}
+	require.Len(t, docs, 2)
+
+	// Deployment: pod template labels must carry release label for status queries.
+	dep := docs[0]
+	tmplMeta := dep["spec"].(map[string]any)["template"].(map[string]any)["metadata"].(map[string]any)
+	tmplLbls := tmplMeta["labels"].(map[string]any)
+	require.Equal(t, "my-api", tmplLbls["kuberport.io/release"])
+	require.Equal(t, "web", tmplLbls["kuberport.io/template"])
+	require.Equal(t, "true", tmplLbls["kuberport.io/managed"])
+
+	// Service: no spec.template, must not panic, top-level labels still stamped.
+	svc := docs[1]
+	svcLbls := svc["metadata"].(map[string]any)["labels"].(map[string]any)
+	require.Equal(t, "my-api", svcLbls["kuberport.io/release"])
+	_, hasTemplate := svc["spec"].(map[string]any)["template"]
+	require.False(t, hasTemplate)
+}
+
+const cronJobYAML = `
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: nightly }
+spec:
+  schedule: "0 0 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: app
+              image: busybox
+          restartPolicy: OnFailure
+`
+
+func TestRender_StampsCronJobPodTemplateLabels(t *testing.T) {
+	out, err := template.Render(cronJobYAML, "fields: []\n", []byte(`{}`), template.Labels{
+		ReleaseName: "nightly-rel", TemplateName: "cron", TemplateVersion: 1,
+	})
+	require.NoError(t, err)
+
+	var doc map[string]any
+	require.NoError(t, yaml.NewDecoder(bytes.NewReader(out)).Decode(&doc))
+
+	// Nested pod template under spec.jobTemplate.spec.template.metadata.labels
+	podMeta := doc["spec"].(map[string]any)["jobTemplate"].(map[string]any)["spec"].(map[string]any)["template"].(map[string]any)["metadata"].(map[string]any)
+	require.Equal(t, "nightly-rel", podMeta["labels"].(map[string]any)["kuberport.io/release"])
+
+	// Top-level CronJob labels still stamped.
+	require.Equal(t, "nightly-rel", doc["metadata"].(map[string]any)["labels"].(map[string]any)["kuberport.io/release"])
+}
+
+const configMapYAML = `
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: conf }
+data:
+  key: value
+`
+
+func TestRender_NoSpecResourceDoesNotPanic(t *testing.T) {
+	out, err := template.Render(configMapYAML, "fields: []\n", []byte(`{}`), template.Labels{
+		ReleaseName: "c", TemplateName: "conf", TemplateVersion: 1,
+	})
+	require.NoError(t, err)
+	var doc map[string]any
+	require.NoError(t, yaml.NewDecoder(bytes.NewReader(out)).Decode(&doc))
+	lbls := doc["metadata"].(map[string]any)["labels"].(map[string]any)
+	require.Equal(t, "c", lbls["kuberport.io/release"])
+}
+
 func TestRender_PatternValidation(t *testing.T) {
 	uiSpec := `fields:
   - path: Deployment[web].metadata.name

@@ -199,8 +199,8 @@ ADM=$(curl -ks -X POST https://host.docker.internal:5556/token \
   -d username=admin@example.com -d password=admin \
   -d 'scope=openid email profile groups' | jq -r .id_token)
 
-# Cluster
-CA=$(cat deploy/docker/certs/dex.crt)   # dummy; real CA is kind's, see below
+# Cluster — register with kind's own CA (not dex's; the CA here validates
+# the apiserver cert, and kind signs that with its internal cluster CA).
 KIND_CA=$(kubectl --context kind-kuberport config view --raw --minify --flatten -o json \
   | jq -r '.clusters[0].cluster."certificate-authority-data"' | base64 -d)
 
