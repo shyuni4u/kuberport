@@ -70,7 +70,7 @@ Browser ── Next.js (k8s Pod, BFF) ── Go API (in k8s) ── Target k8s c
 
 전체 내용: [docs/superpowers/specs/2026-04-16-initial-design.md](docs/superpowers/specs/2026-04-16-initial-design.md).
 
-## 빠른 시작 (Plan 1 머지 후)
+## 빠른 시작
 
 ```bash
 # 1. 로컬 Postgres + dex (OIDC) 띄우기
@@ -90,7 +90,26 @@ pnpm install && pnpm dev
 # 5. http://localhost:3000 접속, alice / alice 로 로그인
 ```
 
-Plan 1 실행 전까지는 위 커맨드가 실패한다 — `backend/` · `frontend/` 코드가 아직 없다. 진행 상황은 아래 로드맵 참조.
+Plan 1 진행 중 — `backend/` · `frontend/` 스캐폴딩 완료. 태스크별 진행 상황은 [Plan 1](docs/superpowers/plans/2026-04-16-mvp-1-vertical-slice.md) 체크박스 참조.
+
+## 테스트 실행
+
+```bash
+# Unit + integration (compose 기동 상태 필요, backend/CLAUDE.md 참조)
+make test                      # == cd backend && go test ./...
+
+# End-to-end (kind 클러스터 필요, 플랜 Task 22 참조)
+export KBP_KIND_API=https://127.0.0.1:6443
+make e2e
+```
+
+## 필수 도구
+
+- Docker (로컬 Postgres + dex)
+- Go 1.22+
+- Node 20+, pnpm 9+
+- [`atlas`](https://atlasgo.io) CLI, `sqlc`
+- (e2e 전용) kind 클러스터 + `kubectl`
 
 ## 로드맵
 
