@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"kuberport/internal/api"
+	"kuberport/internal/config"
 )
 
 func TestTemplates_CreateListPublish(t *testing.T) {
@@ -17,6 +20,7 @@ func TestTemplates_CreateListPublish(t *testing.T) {
 		"display_name":   "Web Service",
 		"description":    "simple",
 		"tags":           []string{"web"},
+		"authoring_mode": "yaml",
 		"resources_yaml": minimalResources,
 		"ui_spec_yaml":   minimalUISpec,
 	}
@@ -59,6 +63,7 @@ func TestTemplates_Create_InvalidYAMLReturns400(t *testing.T) {
 	body := map[string]any{
 		"name":           "bad-" + randSuffix(),
 		"display_name":   "Bad",
+		"authoring_mode": "yaml",
 		"resources_yaml": "not: yaml: [",
 		"ui_spec_yaml":   minimalUISpec,
 	}
@@ -72,4 +77,64 @@ func TestTemplates_Get_UnknownReturns404(t *testing.T) {
 	r := newTestRouterAdmin(t)
 	w := do(t, r, http.MethodGet, "/v1/templates/does-not-exist-"+randSuffix(), nil)
 	require.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestTemplates_Create_UIMode(t *testing.T) {
+	r := newTestRouterAdmin(t)
+	body := map[string]any{
+		"name":           "web-" + randSuffix(),
+		"display_name":   "Web",
+		"authoring_mode": "ui",
+		"ui_state": map[string]any{
+			"resources": []any{
+				map[string]any{
+					"apiVersion": "apps/v1", "kind": "Deployment", "name": "web",
+					"fields": map[string]any{
+						"spec.replicas": map[string]any{
+							"mode":   "exposed",
+							"uiSpec": map[string]any{"label": "Replicas", "type": "integer", "default": 1, "required": true},
+						},
+						"spec.selector.matchLabels.app":          map[string]any{"mode": "fixed", "fixedValue": "web"},
+						"spec.template.metadata.labels.app":      map[string]any{"mode": "fixed", "fixedValue": "web"},
+						"spec.template.spec.containers[0].name":  map[string]any{"mode": "fixed", "fixedValue": "app"},
+						"spec.template.spec.containers[0].image": map[string]any{"mode": "fixed", "fixedValue": "nginx:1.25"},
+					},
+				},
+			},
+		},
+	}
+	raw, _ := json.Marshal(body)
+	w := do(t, r, http.MethodPost, "/v1/templates", bytes.NewReader(raw))
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"authoring_mode":"ui"`)
+	require.Contains(t, w.Body.String(), "kind: Deployment") // resources_yaml populated
+}
+
+func TestTemplates_Create_ModeMismatch_Rejected(t *testing.T) {
+	r := newTestRouterAdmin(t)
+	// mode=ui but no ui_state
+	body := `{"name":"x-` + randSuffix() + `","display_name":"X","authoring_mode":"ui","resources_yaml":"","ui_spec_yaml":""}`
+	w := do(t, r, http.MethodPost, "/v1/templates", bytes.NewReader([]byte(body)))
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Contains(t, w.Body.String(), "ui_state")
+
+	// mode=yaml but ui_state present
+	body = `{"name":"y-` + randSuffix() + `","display_name":"Y","authoring_mode":"yaml","resources_yaml":"apiVersion: v1\nkind: ConfigMap\nmetadata: {name: c}\ndata: {k: v}\n","ui_spec_yaml":"fields: []\n","ui_state":{"resources":[]}}`
+	w = do(t, r, http.MethodPost, "/v1/templates", bytes.NewReader([]byte(body)))
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Contains(t, w.Body.String(), "ui_state")
+}
+
+func TestTemplates_Create_OwningTeam(t *testing.T) {
+	s := testStore(t)
+	adminR := api.NewRouter(config.Config{}, api.Deps{Verifier: adminVerifier{}, Store: s})
+
+	tid := createTeam(t, adminR, "team-"+randSuffix())
+
+	body := `{"name":"t-` + randSuffix() + `","display_name":"T","authoring_mode":"yaml",
+      "resources_yaml":"apiVersion: v1\nkind: ConfigMap\nmetadata: {name: c}\ndata: {k: v}\n",
+      "ui_spec_yaml":"fields: []\n","owning_team_id":"` + tid + `"}`
+	w := do(t, adminR, http.MethodPost, "/v1/templates", bytes.NewReader([]byte(body)))
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"owning_team_id"`)
 }

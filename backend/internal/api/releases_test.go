@@ -88,6 +88,7 @@ func seedPublishedTemplate(t *testing.T, r http.Handler) string {
 	body, _ := json.Marshal(map[string]any{
 		"name":           name,
 		"display_name":   "Test Template",
+		"authoring_mode": "yaml",
 		"resources_yaml": minimalResources,
 		"ui_spec_yaml":   minimalUISpec,
 	})
@@ -392,6 +393,7 @@ func TestReleases_Create_UnpublishedReturns409(t *testing.T) {
 	tplBody, _ := json.Marshal(map[string]any{
 		"name":           tplName,
 		"display_name":   "Draft Only",
+		"authoring_mode": "yaml",
 		"resources_yaml": minimalResources,
 		"ui_spec_yaml":   minimalUISpec,
 	})

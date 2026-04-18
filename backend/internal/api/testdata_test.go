@@ -62,6 +62,7 @@ func seedGlobalTemplate(t *testing.T, router http.Handler) string {
 		"display_name":   "Global Template",
 		"description":    "test global template",
 		"tags":           []string{"global"},
+		"authoring_mode": "yaml",
 		"resources_yaml": minimalResources,
 		"ui_spec_yaml":   minimalUISpec,
 	}
@@ -88,6 +89,7 @@ func seedTemplateOwnedBy(t *testing.T, router http.Handler, teamID string) strin
 		"display_name":   "Team Template",
 		"description":    "test team-owned template",
 		"tags":           []string{"team"},
+		"authoring_mode": "yaml",
 		"resources_yaml": minimalResources,
 		"ui_spec_yaml":   minimalUISpec,
 		"owning_team_id": teamID,
