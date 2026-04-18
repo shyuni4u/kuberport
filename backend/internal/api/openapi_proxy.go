@@ -29,8 +29,9 @@ type openapiCacheEntry struct {
 }
 
 type openapiProxy struct {
-	cache *lru.Cache[openapiCacheKey, openapiCacheEntry]
-	mu    sync.Mutex
+	cache      *lru.Cache[openapiCacheKey, openapiCacheEntry]
+	mu         sync.Mutex
+	transports sync.Map // map[string]http.RoundTripper, key = caBundle string (empty ok)
 }
 
 const openapiTTL = 60 * time.Minute
@@ -41,6 +42,17 @@ func newOpenAPIProxy(size int) *openapiProxy {
 	}
 	c, _ := lru.New[openapiCacheKey, openapiCacheEntry](size)
 	return &openapiProxy{cache: c}
+}
+
+func (p *openapiProxy) transportFor(caBundle string) http.RoundTripper {
+	if v, ok := p.transports.Load(caBundle); ok {
+		return v.(http.RoundTripper)
+	}
+	t := buildTransport(caBundle)
+	if existing, loaded := p.transports.LoadOrStore(caBundle, t); loaded {
+		return existing.(http.RoundTripper)
+	}
+	return t
 }
 
 func (h *Handlers) GetOpenAPIIndex(c *gin.Context) {
@@ -58,7 +70,11 @@ func (h *Handlers) GetOpenAPIGroupVersion(c *gin.Context) {
 
 func (h *Handlers) RefreshOpenAPI(c *gin.Context) {
 	cluster := c.Param("name")
-	u, _ := auth.UserFrom(c.Request.Context())
+	u, ok := auth.UserFrom(c.Request.Context())
+	if !ok {
+		writeError(c, http.StatusUnauthorized, "unauthenticated", "user not in context")
+		return
+	}
 	h.openapi.mu.Lock()
 	defer h.openapi.mu.Unlock()
 	for _, k := range h.openapi.cache.Keys() {
@@ -76,7 +92,11 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 		writeError(c, http.StatusNotFound, "not-found", "cluster "+name)
 		return
 	}
-	u, _ := auth.UserFrom(c.Request.Context())
+	u, ok := auth.UserFrom(c.Request.Context())
+	if !ok {
+		writeError(c, http.StatusUnauthorized, "unauthenticated", "user not in context")
+		return
+	}
 
 	key := openapiCacheKey{cluster: name, user: u.Subject, gv: gv}
 	if e, ok := h.openapi.cache.Get(key); ok && time.Since(e.storedAt) < openapiTTL {
@@ -94,11 +114,15 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 		return
 	}
 	up.Path = upstreamPath
-	req, _ := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, up.String(), nil)
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, up.String(), nil)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	req.Header.Set("Authorization", "Bearer "+u.IDToken)
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Transport: buildTransport(cluster.CaBundle.String)}
+	client := &http.Client{Transport: h.openapi.transportFor(cluster.CaBundle.String)}
 	resp, err := client.Do(req)
 	if err != nil {
 		writeError(c, http.StatusBadGateway, "k8s-error", err.Error())
@@ -106,7 +130,7 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024)) // 10 MiB cap
 	if err != nil {
 		writeError(c, http.StatusBadGateway, "k8s-error", err.Error())
 		return
@@ -126,6 +150,9 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 
 func buildTransport(caBundle string) http.RoundTripper {
 	t := http.DefaultTransport.(*http.Transport).Clone()
+	// TODO(plan3): reject empty CA in production instead of falling back to
+	// InsecureSkipVerify. For now this mirrors Plan 1's K8sFactory.NewWithToken
+	// behaviour — local dex/kind setups need this to work out of the box.
 	if strings.TrimSpace(caBundle) == "" {
 		t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		return t

@@ -141,7 +141,7 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 			writeError(c, http.StatusConflict, "conflict", "template name already exists")
 			return
 		}
-		writeError(c, http.StatusConflict, "conflict", err.Error())
+		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 
