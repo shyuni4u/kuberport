@@ -11,26 +11,40 @@ import (
 )
 
 type Querier interface {
+	CountTemplatesForTeam(ctx context.Context, owningTeamID pgtype.UUID) (int64, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	DeleteRelease(ctx context.Context, id pgtype.UUID) error
 	DeleteSession(ctx context.Context, id pgtype.UUID) error
+	DeleteTeam(ctx context.Context, id pgtype.UUID) error
+	DeleteTeamMembership(ctx context.Context, arg DeleteTeamMembershipParams) error
 	GetClusterByName(ctx context.Context, name string) (Cluster, error)
 	GetReleaseByID(ctx context.Context, id pgtype.UUID) (GetReleaseByIDRow, error)
 	GetSession(ctx context.Context, id pgtype.UUID) (Session, error)
+	GetTeamByID(ctx context.Context, id pgtype.UUID) (Team, error)
+	GetTeamByName(ctx context.Context, name string) (Team, error)
+	GetTeamMembership(ctx context.Context, arg GetTeamMembershipParams) (TeamMembership, error)
 	GetTemplateByName(ctx context.Context, name string) (Template, error)
 	GetTemplateVersion(ctx context.Context, arg GetTemplateVersionParams) (TemplateVersion, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	InsertCluster(ctx context.Context, arg InsertClusterParams) (Cluster, error)
 	InsertRelease(ctx context.Context, arg InsertReleaseParams) (Release, error)
+	InsertTeam(ctx context.Context, arg InsertTeamParams) (Team, error)
+	InsertTeamMembership(ctx context.Context, arg InsertTeamMembershipParams) (TeamMembership, error)
 	InsertTemplate(ctx context.Context, arg InsertTemplateParams) (Template, error)
+	InsertTemplateV2(ctx context.Context, arg InsertTemplateV2Params) (Template, error)
 	InsertTemplateVersion(ctx context.Context, arg InsertTemplateVersionParams) (TemplateVersion, error)
+	InsertTemplateVersionV2(ctx context.Context, arg InsertTemplateVersionV2Params) (TemplateVersion, error)
 	ListAllReleases(ctx context.Context, arg ListAllReleasesParams) ([]ListAllReleasesRow, error)
 	ListClusters(ctx context.Context) ([]Cluster, error)
 	ListReleasesForUser(ctx context.Context, arg ListReleasesForUserParams) ([]ListReleasesForUserRow, error)
+	ListTeamMembers(ctx context.Context, teamID pgtype.UUID) ([]ListTeamMembersRow, error)
+	ListTeams(ctx context.Context) ([]Team, error)
+	ListTeamsForUser(ctx context.Context, userID pgtype.UUID) ([]Team, error)
 	ListTemplateVersions(ctx context.Context, name string) ([]TemplateVersion, error)
 	ListTemplates(ctx context.Context) ([]ListTemplatesRow, error)
 	NextTemplateVersion(ctx context.Context, templateID pgtype.UUID) (int32, error)
 	PublishTemplateVersion(ctx context.Context, id pgtype.UUID) (TemplateVersion, error)
+	SetTemplateVersionStatus(ctx context.Context, arg SetTemplateVersionStatusParams) (TemplateVersion, error)
 	UpdateSessionTokens(ctx context.Context, arg UpdateSessionTokensParams) error
 	UpdateTemplateCurrentVersion(ctx context.Context, arg UpdateTemplateCurrentVersionParams) error
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
