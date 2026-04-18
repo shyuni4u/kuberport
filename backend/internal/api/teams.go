@@ -1,9 +1,12 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"kuberport/internal/auth"
 	"kuberport/internal/store"
@@ -40,6 +43,9 @@ func (h *Handlers) ListTeams(c *gin.Context) {
 			writeError(c, http.StatusInternalServerError, "internal", err.Error())
 			return
 		}
+		if all == nil {
+			all = []store.Team{}
+		}
 		c.JSON(http.StatusOK, gin.H{"teams": all})
 		return
 	}
@@ -58,6 +64,9 @@ func (h *Handlers) ListTeams(c *gin.Context) {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	if mine == nil {
+		mine = []store.Team{}
+	}
 	c.JSON(http.StatusOK, gin.H{"teams": mine})
 }
 
@@ -69,4 +78,77 @@ func isKuberportAdmin(u auth.RequestUser) bool {
 		}
 	}
 	return false
+}
+
+// parseUUIDParam extracts and parses a UUID from the path parameter.
+func parseUUIDParam(c *gin.Context, paramName string) (pgtype.UUID, bool) {
+	paramStr := c.Param(paramName)
+	u, err := uuid.Parse(paramStr)
+	if err != nil {
+		writeError(c, http.StatusBadRequest, "validation-error", fmt.Sprintf("invalid %s", paramName))
+		return pgtype.UUID{}, false
+	}
+	return pgtype.UUID{Bytes: u, Valid: true}, true
+}
+
+type addMemberReq struct {
+	Email string `json:"email" binding:"required,email"`
+	Role  string `json:"role"  binding:"required,oneof=editor viewer"`
+}
+
+func (h *Handlers) ListTeamMembers(c *gin.Context) {
+	tid, ok := parseUUIDParam(c, "id")
+	if !ok {
+		return
+	}
+	members, err := h.deps.Store.ListTeamMembers(c, tid)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"members": members})
+}
+
+func (h *Handlers) AddTeamMember(c *gin.Context) {
+	tid, ok := parseUUIDParam(c, "id")
+	if !ok {
+		return
+	}
+	var r addMemberReq
+	if err := c.ShouldBindJSON(&r); err != nil {
+		writeError(c, http.StatusBadRequest, "validation-error", err.Error())
+		return
+	}
+	target, err := h.deps.Store.GetUserByEmail(c, store.PgText(r.Email))
+	if err != nil {
+		writeError(c, http.StatusNotFound, "user-not-found",
+			"user must have logged in at least once before being added to a team")
+		return
+	}
+	m, err := h.deps.Store.InsertTeamMembership(c, store.InsertTeamMembershipParams{
+		UserID: target.ID,
+		TeamID: tid,
+		Role:   r.Role,
+	})
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusCreated, m)
+}
+
+func (h *Handlers) RemoveTeamMember(c *gin.Context) {
+	tid, ok := parseUUIDParam(c, "id")
+	if !ok {
+		return
+	}
+	uid, ok := parseUUIDParam(c, "user_id")
+	if !ok {
+		return
+	}
+	if err := h.deps.Store.DeleteTeamMembership(c, store.DeleteTeamMembershipParams{TeamID: tid, UserID: uid}); err != nil {
+		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

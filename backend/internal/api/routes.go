@@ -56,5 +56,8 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 	v.DELETE("/releases/:id", h.DeleteRelease)
 	v.GET("/teams", h.ListTeams)
 	v.POST("/teams", requireAdmin(), h.CreateTeam)
+	v.GET("/teams/:id/members", h.ListTeamMembers)
+	v.POST("/teams/:id/members", requireAdmin(), h.AddTeamMember)
+	v.DELETE("/teams/:id/members/:user_id", requireAdmin(), h.RemoveTeamMember)
 	return r
 }

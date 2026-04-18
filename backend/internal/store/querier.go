@@ -25,6 +25,7 @@ type Querier interface {
 	GetTeamMembership(ctx context.Context, arg GetTeamMembershipParams) (TeamMembership, error)
 	GetTemplateByName(ctx context.Context, name string) (Template, error)
 	GetTemplateVersion(ctx context.Context, arg GetTemplateVersionParams) (TemplateVersion, error)
+	GetUserByEmail(ctx context.Context, email pgtype.Text) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	InsertCluster(ctx context.Context, arg InsertClusterParams) (Cluster, error)
 	InsertRelease(ctx context.Context, arg InsertReleaseParams) (Release, error)
