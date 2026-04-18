@@ -232,7 +232,11 @@ func (h *Handlers) GetRelease(c *gin.Context) {
 		}
 	}
 
-	u, _ := auth.UserFrom(ctx)
+	u, ok := auth.UserFrom(ctx)
+	if !ok {
+		respondReleaseOverview(c, rel, nil)
+		return
+	}
 	cli, err := h.deps.K8sFactory.NewWithToken(rel.ClusterApiUrl, rel.ClusterCaBundle.String, u.IDToken)
 	if err != nil {
 		respondReleaseOverview(c, rel, nil)
@@ -275,6 +279,7 @@ func respondReleaseOverview(c *gin.Context, rel store.GetReleaseByIDRow, instanc
 
 // abstractStatus derives a summary status from pod instances.
 func abstractStatus(instances []k8s.Instance) string {
+	const maxRestartsBeforeError = 5
 	if len(instances) == 0 {
 		return "unknown"
 	}
@@ -284,7 +289,7 @@ func abstractStatus(instances []k8s.Instance) string {
 		if !i.Ready {
 			allReady = false
 		}
-		if i.Phase == "Failed" || i.Restarts > 5 {
+		if i.Phase == "Failed" || i.Restarts > maxRestartsBeforeError {
 			hasError = true
 		}
 	}
