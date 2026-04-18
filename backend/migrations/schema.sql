@@ -48,6 +48,26 @@ CREATE TABLE "public"."sessions" (
 );
 -- Create index "s_expires_at" to table: "sessions"
 CREATE INDEX "s_expires_at" ON "public"."sessions" ("expires_at");
+-- Create "team_memberships" table
+CREATE TABLE "public"."team_memberships" (
+  "user_id" uuid NOT NULL,
+  "team_id" uuid NOT NULL,
+  "role" text NOT NULL,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("user_id", "team_id")
+);
+-- Create index "tm_team" to table: "team_memberships"
+CREATE INDEX "tm_team" ON "public"."team_memberships" ("team_id");
+-- Create "teams" table
+CREATE TABLE "public"."teams" (
+  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+  "name" text NOT NULL,
+  "display_name" text NULL,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("id")
+);
+-- Create index "teams_name_uq" to table: "teams"
+CREATE UNIQUE INDEX "teams_name_uq" ON "public"."teams" ("name");
 -- Create "template_versions" table
 CREATE TABLE "public"."template_versions" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -61,6 +81,8 @@ CREATE TABLE "public"."template_versions" (
   "created_by_user_id" uuid NOT NULL,
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "published_at" timestamptz NULL,
+  "authoring_mode" text NOT NULL DEFAULT 'yaml',
+  "ui_state_json" jsonb NULL,
   PRIMARY KEY ("id")
 );
 -- Create index "tv_draft_unique" to table: "template_versions"
@@ -78,6 +100,7 @@ CREATE TABLE "public"."templates" (
   "current_version_id" uuid NULL,
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz NOT NULL DEFAULT now(),
+  "owning_team_id" uuid NULL,
   PRIMARY KEY ("id")
 );
 -- Create index "templates_name_uq" to table: "templates"
@@ -98,7 +121,9 @@ CREATE UNIQUE INDEX "users_oidc_sub" ON "public"."users" ("oidc_subject");
 ALTER TABLE "public"."releases" ADD CONSTRAINT "r_cluster_fk" FOREIGN KEY ("cluster_id") REFERENCES "public"."clusters" ("id") ON UPDATE NO ACTION ON DELETE RESTRICT, ADD CONSTRAINT "r_owner_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users" ("id") ON UPDATE NO ACTION ON DELETE RESTRICT, ADD CONSTRAINT "r_tv_fk" FOREIGN KEY ("template_version_id") REFERENCES "public"."template_versions" ("id") ON UPDATE NO ACTION ON DELETE RESTRICT;
 -- Modify "sessions" table
 ALTER TABLE "public"."sessions" ADD CONSTRAINT "s_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON UPDATE NO ACTION ON DELETE CASCADE;
+-- Modify "team_memberships" table
+ALTER TABLE "public"."team_memberships" ADD CONSTRAINT "tm_team_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams" ("id") ON UPDATE NO ACTION ON DELETE CASCADE, ADD CONSTRAINT "tm_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users" ("id") ON UPDATE NO ACTION ON DELETE CASCADE;
 -- Modify "template_versions" table
 ALTER TABLE "public"."template_versions" ADD CONSTRAINT "tv_template_fk" FOREIGN KEY ("template_id") REFERENCES "public"."templates" ("id") ON UPDATE NO ACTION ON DELETE CASCADE;
 -- Modify "templates" table
-ALTER TABLE "public"."templates" ADD CONSTRAINT "t_current_version_fk" FOREIGN KEY ("current_version_id") REFERENCES "public"."template_versions" ("id") ON UPDATE NO ACTION ON DELETE SET NULL, ADD CONSTRAINT "t_owner_fk" FOREIGN KEY ("owner_user_id") REFERENCES "public"."users" ("id") ON UPDATE NO ACTION ON DELETE RESTRICT;
+ALTER TABLE "public"."templates" ADD CONSTRAINT "t_current_version_fk" FOREIGN KEY ("current_version_id") REFERENCES "public"."template_versions" ("id") ON UPDATE NO ACTION ON DELETE SET NULL, ADD CONSTRAINT "t_owner_fk" FOREIGN KEY ("owner_user_id") REFERENCES "public"."users" ("id") ON UPDATE NO ACTION ON DELETE RESTRICT, ADD CONSTRAINT "t_team_fk" FOREIGN KEY ("owning_team_id") REFERENCES "public"."teams" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
