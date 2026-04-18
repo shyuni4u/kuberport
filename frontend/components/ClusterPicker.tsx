@@ -1,0 +1,40 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+export function ClusterPicker() {
+  const [clusters, setClusters] = useState<{ name: string }[]>([]);
+  const [current, setCurrent] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/v1/clusters")
+      .then((r) => r.json())
+      .then((d) => {
+        setClusters(d.clusters ?? []);
+        const stored =
+          localStorage.getItem("kbp_cluster") ?? d.clusters?.[0]?.name ?? "";
+        setCurrent(stored);
+      })
+      .catch(() => {});
+  }, []);
+
+  function pick(name: string) {
+    setCurrent(name);
+    localStorage.setItem("kbp_cluster", name);
+    location.reload();
+  }
+
+  return (
+    <select
+      value={current}
+      onChange={(e) => pick(e.target.value)}
+      className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs"
+    >
+      {clusters.map((c) => (
+        <option key={c.name} value={c.name}>
+          {c.name}
+        </option>
+      ))}
+    </select>
+  );
+}
