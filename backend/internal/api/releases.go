@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -145,7 +146,9 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 	caBundle := cluster.CaBundle.String
 	cli, err := h.deps.K8sFactory.NewWithToken(cluster.ApiUrl, caBundle, u.IDToken)
 	if err != nil {
-		if delErr := h.deps.Store.DeleteRelease(ctx, rel.ID); delErr != nil {
+		rollbackCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if delErr := h.deps.Store.DeleteRelease(rollbackCtx, rel.ID); delErr != nil {
 			log.Printf("rollback: failed to delete release %s from DB: %v", rel.Name, delErr)
 		}
 		writeError(c, http.StatusInternalServerError, "k8s-error", err.Error())
@@ -153,8 +156,9 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 	}
 	if err := cli.ApplyAll(ctx, r.Namespace, rendered); err != nil {
 		// Clean up partially created k8s resources with an independent context
-		// so cleanup proceeds even if the client disconnected.
-		cleanupCtx := context.Background()
+		// and a timeout so cleanup doesn't hang indefinitely.
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		if delErr := cli.DeleteByRelease(cleanupCtx, r.Namespace, r.Name); delErr != nil {
 			log.Printf("rollback: failed to delete k8s resources for release %s: %v", r.Name, delErr)
 		}
