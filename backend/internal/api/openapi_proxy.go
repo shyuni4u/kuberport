@@ -3,9 +3,11 @@ package api
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -49,15 +51,18 @@ func newOpenAPIProxy(size int) *openapiProxy {
 	return &openapiProxy{cache: c}
 }
 
-func (p *openapiProxy) transportFor(caBundle string) http.RoundTripper {
+func (p *openapiProxy) transportFor(caBundle string) (http.RoundTripper, error) {
 	if v, ok := p.transports.Load(caBundle); ok {
-		return v.(http.RoundTripper)
+		return v.(http.RoundTripper), nil
 	}
-	t := buildTransport(caBundle)
+	t, err := buildTransport(caBundle)
+	if err != nil {
+		return nil, err
+	}
 	if existing, loaded := p.transports.LoadOrStore(caBundle, t); loaded {
-		return existing.(http.RoundTripper)
+		return existing.(http.RoundTripper), nil
 	}
-	return t
+	return t, nil
 }
 
 func (h *Handlers) GetOpenAPIIndex(c *gin.Context) {
@@ -82,6 +87,8 @@ func (h *Handlers) RefreshOpenAPI(c *gin.Context) {
 	}
 	h.openapi.mu.Lock()
 	defer h.openapi.mu.Unlock()
+	// Cache is LRU-bounded (default 64 entries, KBP_OPENAPI_CACHE_MAX).
+	// O(N) iteration under the mutex is fine at this scale.
 	for _, k := range h.openapi.cache.Keys() {
 		if k.cluster == cluster && k.user == u.Subject {
 			h.openapi.cache.Remove(k)
@@ -127,8 +134,13 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 	req.Header.Set("Authorization", "Bearer "+u.IDToken)
 	req.Header.Set("Accept", "application/json")
 
+	tr, err := h.openapi.transportFor(cluster.CaBundle.String)
+	if err != nil {
+		writeError(c, http.StatusInternalServerError, "cluster-config", err.Error())
+		return
+	}
 	client := &http.Client{
-		Transport: h.openapi.transportFor(cluster.CaBundle.String),
+		Transport: tr,
 		Timeout:   30 * time.Second,
 	}
 	resp, err := client.Do(req)
@@ -162,23 +174,26 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 	c.Data(http.StatusOK, ct, body)
 }
 
-func buildTransport(caBundle string) http.RoundTripper {
+// buildTransport returns an http.RoundTripper that trusts the cluster's
+// declared CA. Empty CA bundles are rejected in production; set
+// KBP_DEV_ALLOW_INSECURE_CLUSTERS=true locally (e.g. for kind with self-
+// signed certs) to opt into InsecureSkipVerify. Never set this in prod.
+func buildTransport(caBundle string) (http.RoundTripper, error) {
 	t := http.DefaultTransport.(*http.Transport).Clone()
-	// TODO(plan3): reject empty CA in production instead of falling back to
-	// InsecureSkipVerify. For now this mirrors Plan 1's K8sFactory.NewWithToken
-	// behaviour — local dex/kind setups need this to work out of the box.
 	if strings.TrimSpace(caBundle) == "" {
+		if os.Getenv("KBP_DEV_ALLOW_INSECURE_CLUSTERS") != "true" {
+			return nil, errors.New("cluster has no ca_bundle; set KBP_DEV_ALLOW_INSECURE_CLUSTERS=true for local dev")
+		}
 		t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-		return t
+		return t, nil
 	}
 	pool, err := x509.SystemCertPool()
 	if err != nil || pool == nil {
 		pool = x509.NewCertPool()
 	}
 	if ok := pool.AppendCertsFromPEM([]byte(caBundle)); !ok {
-		t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-		return t
+		return nil, errors.New("ca_bundle is not valid PEM")
 	}
 	t.TLSClientConfig = &tls.Config{RootCAs: pool}
-	return t
+	return t, nil
 }

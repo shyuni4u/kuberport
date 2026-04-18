@@ -70,4 +70,17 @@ func TestSerializeUIMode_NoExposedFields(t *testing.T) {
 	require.Contains(t, uispec, "fields: []")
 }
 
+func TestSerializeUIMode_RejectsHugeArrayIndex(t *testing.T) {
+	ui := template.UIModeTemplate{
+		Resources: []template.UIResource{
+			{APIVersion: "apps/v1", Kind: "Deployment", Name: "web", Fields: map[string]template.UIField{
+				"spec.template.spec.containers[9999].image": {Mode: "fixed", FixedValue: "x"},
+			}},
+		},
+	}
+	_, _, err := template.SerializeUIMode(ui)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exceeds limit")
+}
+
 func intPtr(n int) *int { return &n }

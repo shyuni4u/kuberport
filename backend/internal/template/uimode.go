@@ -10,6 +10,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// maxArrayIndex caps auto-grown array length in setJSONPathAbsolute to guard
+// against malicious paths like containers[99999999] causing OOM. Any realistic
+// k8s resource has far fewer array elements at a single path (Deployments have
+// a handful of containers, Services a handful of ports, etc.).
+const maxArrayIndex = 1024
+
 type UIModeTemplate struct {
 	Resources []UIResource `json:"resources"`
 }
@@ -165,6 +171,9 @@ func setJSONPathAbsolute(obj map[string]any, path string, v any) error {
 			arr, ok := current.([]any)
 			if !ok {
 				return fmt.Errorf("not an array at [%d]", s.idx)
+			}
+			if s.idx > maxArrayIndex {
+				return fmt.Errorf("array index %d exceeds limit %d", s.idx, maxArrayIndex)
 			}
 			for len(arr) <= s.idx {
 				if last {

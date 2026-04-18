@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -141,7 +142,8 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 			writeError(c, http.StatusConflict, "conflict", "template name already exists")
 			return
 		}
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+		log.Printf("CreateTemplate: %v", err) // server-side only
+		writeError(c, http.StatusInternalServerError, "internal", "failed to create template")
 		return
 	}
 

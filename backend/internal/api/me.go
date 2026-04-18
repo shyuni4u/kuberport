@@ -14,7 +14,11 @@ import (
 // endpoints (ListTeams, ListTeamMembers, ensureTemplateEditor) can look the
 // caller up by oidc_subject without touching the DB in write mode.
 func (h *Handlers) GetMe(c *gin.Context) {
-	u, _ := auth.UserFrom(c.Request.Context())
+	u, ok := auth.UserFrom(c.Request.Context())
+	if !ok {
+		writeError(c, http.StatusUnauthorized, "unauthenticated", "user not in context")
+		return
+	}
 	if _, err := h.deps.Store.UpsertUser(c, store.UpsertUserParams{
 		OidcSubject: u.Subject,
 		Email:       store.PgText(u.Email),
