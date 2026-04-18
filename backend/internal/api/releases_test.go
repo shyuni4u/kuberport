@@ -11,13 +11,15 @@ import (
 
 	"kuberport/internal/api"
 	"kuberport/internal/config"
+	"kuberport/internal/k8s"
 	"kuberport/internal/store"
 )
 
 // fakeK8sApplier records calls for test assertions.
 type fakeK8sApplier struct {
-	applied [][]byte
-	deleted []string
+	applied   [][]byte
+	deleted   []string
+	instances []k8s.Instance
 }
 
 func (f *fakeK8sApplier) ApplyAll(_ context.Context, _ string, y []byte) error {
@@ -28,6 +30,10 @@ func (f *fakeK8sApplier) ApplyAll(_ context.Context, _ string, y []byte) error {
 func (f *fakeK8sApplier) DeleteByRelease(_ context.Context, _, release string) error {
 	f.deleted = append(f.deleted, release)
 	return nil
+}
+
+func (f *fakeK8sApplier) ListInstances(_ context.Context, _, _ string) ([]k8s.Instance, error) {
+	return f.instances, nil
 }
 
 // fakeK8sFactory returns the same fakeK8sApplier for every call.
@@ -119,7 +125,7 @@ func TestReleases_CreateAndList(t *testing.T) {
 }
 
 func TestReleases_GetByID(t *testing.T) {
-	r, _ := newTestRouterWithK8s(t)
+	r, fk := newTestRouterWithK8s(t)
 	clusterName := seedCluster(t, r)
 	tplName := seedPublishedTemplate(t, r)
 
@@ -141,9 +147,84 @@ func TestReleases_GetByID(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &created))
 	id := created["id"].(string)
 
+	// Set fake instances for GET
+	fk.instances = []k8s.Instance{
+		{Name: "web-abc", Phase: "Running", Ready: true, Restarts: 0},
+		{Name: "web-def", Phase: "Running", Ready: true, Restarts: 1},
+		{Name: "web-ghi", Phase: "Pending", Ready: false, Restarts: 0},
+	}
+
 	w = do(t, r, http.MethodGet, "/v1/releases/"+id, nil)
 	require.Equal(t, http.StatusOK, w.Code)
-	require.Contains(t, w.Body.String(), relName)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	require.Equal(t, relName, got["name"])
+	require.EqualValues(t, 3, got["instances_total"])
+	require.EqualValues(t, 2, got["instances_ready"])
+	require.Equal(t, "warning", got["status"])
+	require.NotNil(t, got["template"])
+}
+
+func TestReleases_GetByID_AllHealthy(t *testing.T) {
+	r, fk := newTestRouterWithK8s(t)
+	clusterName := seedCluster(t, r)
+	tplName := seedPublishedTemplate(t, r)
+
+	relName := "healthy-" + randSuffix()
+	body, _ := json.Marshal(map[string]any{
+		"template": tplName, "version": 1,
+		"cluster": clusterName, "namespace": "default",
+		"name": relName, "values": map[string]any{"Deployment[web].spec.replicas": 1},
+	})
+	w := do(t, r, http.MethodPost, "/v1/releases", bytes.NewReader(body))
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	var created map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &created))
+	id := created["id"].(string)
+
+	fk.instances = []k8s.Instance{
+		{Name: "web-abc", Phase: "Running", Ready: true, Restarts: 0},
+	}
+
+	w = do(t, r, http.MethodGet, "/v1/releases/"+id, nil)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	require.Equal(t, "healthy", got["status"])
+	require.EqualValues(t, 1, got["instances_ready"])
+}
+
+func TestReleases_GetByID_ErrorStatus(t *testing.T) {
+	r, fk := newTestRouterWithK8s(t)
+	clusterName := seedCluster(t, r)
+	tplName := seedPublishedTemplate(t, r)
+
+	relName := "errpod-" + randSuffix()
+	body, _ := json.Marshal(map[string]any{
+		"template": tplName, "version": 1,
+		"cluster": clusterName, "namespace": "default",
+		"name": relName, "values": map[string]any{"Deployment[web].spec.replicas": 1},
+	})
+	w := do(t, r, http.MethodPost, "/v1/releases", bytes.NewReader(body))
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	var created map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &created))
+	id := created["id"].(string)
+
+	fk.instances = []k8s.Instance{
+		{Name: "web-abc", Phase: "Failed", Ready: false, Restarts: 10},
+	}
+
+	w = do(t, r, http.MethodGet, "/v1/releases/"+id, nil)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	require.Equal(t, "error", got["status"])
 }
 
 func TestReleases_Delete(t *testing.T) {

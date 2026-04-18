@@ -7,13 +7,15 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"kuberport/internal/config"
+	"kuberport/internal/k8s"
 	"kuberport/internal/store"
 )
 
-// K8sApplier applies or deletes resources on a k8s cluster.
+// K8sApplier applies, deletes, or inspects resources on a k8s cluster.
 type K8sApplier interface {
 	ApplyAll(ctx context.Context, ns string, yaml []byte) error
 	DeleteByRelease(ctx context.Context, namespace, release string) error
+	ListInstances(ctx context.Context, namespace, release string) ([]k8s.Instance, error)
 }
 
 // K8sClientFactory creates per-request k8s clients using the caller's token.
