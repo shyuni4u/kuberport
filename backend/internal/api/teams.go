@@ -50,13 +50,10 @@ func (h *Handlers) ListTeams(c *gin.Context) {
 		return
 	}
 
-	user, err := h.deps.Store.UpsertUser(c, store.UpsertUserParams{
-		OidcSubject: u.Subject,
-		Email:       store.PgText(u.Email),
-		DisplayName: store.PgText(u.Name),
-	})
+	user, err := h.deps.Store.GetUserByOidcSubject(c, u.Subject)
 	if err != nil {
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+		// User hasn't warmed up via /v1/me yet — show empty teams.
+		c.JSON(http.StatusOK, gin.H{"teams": []any{}})
 		return
 	}
 	mine, err := h.deps.Store.ListTeamsForUser(c, user.ID)
@@ -105,13 +102,9 @@ func (h *Handlers) ListTeamMembers(c *gin.Context) {
 
 	// Admin can list any team. Non-admins must be members of the target team.
 	if !isKuberportAdmin(u) {
-		caller, err := h.deps.Store.UpsertUser(c, store.UpsertUserParams{
-			OidcSubject: u.Subject,
-			Email:       store.PgText(u.Email),
-			DisplayName: store.PgText(u.Name),
-		})
+		caller, err := h.deps.Store.GetUserByOidcSubject(c, u.Subject)
 		if err != nil {
-			writeError(c, http.StatusInternalServerError, "internal", err.Error())
+			writeError(c, http.StatusForbidden, "rbac-denied", "team member or kuberport-admin required")
 			return
 		}
 		if _, err := h.deps.Store.GetTeamMembership(c, store.GetTeamMembershipParams{

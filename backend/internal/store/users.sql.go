@@ -47,6 +47,24 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	return i, err
 }
 
+const getUserByOidcSubject = `-- name: GetUserByOidcSubject :one
+SELECT id, oidc_subject, email, display_name, first_seen_at, last_seen_at FROM users WHERE oidc_subject = $1
+`
+
+func (q *Queries) GetUserByOidcSubject(ctx context.Context, oidcSubject string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByOidcSubject, oidcSubject)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.OidcSubject,
+		&i.Email,
+		&i.DisplayName,
+		&i.FirstSeenAt,
+		&i.LastSeenAt,
+	)
+	return i, err
+}
+
 const upsertUser = `-- name: UpsertUser :one
 INSERT INTO users (oidc_subject, email, display_name, first_seen_at, last_seen_at)
 VALUES ($1, $2, $3, now(), now())

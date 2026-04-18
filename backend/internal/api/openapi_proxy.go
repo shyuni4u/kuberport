@@ -36,6 +36,11 @@ type openapiProxy struct {
 
 const openapiTTL = 60 * time.Minute
 
+// openapiMaxBytes caps an OpenAPI response we will read from an upstream
+// cluster. Larger bodies are rejected with 502 rather than silently truncated
+// and cached (io.LimitReader on its own does not surface overflow).
+const openapiMaxBytes = 10 * 1024 * 1024
+
 func newOpenAPIProxy(size int) *openapiProxy {
 	if size <= 0 {
 		size = 64
@@ -122,7 +127,10 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 	req.Header.Set("Authorization", "Bearer "+u.IDToken)
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Transport: h.openapi.transportFor(cluster.CaBundle.String)}
+	client := &http.Client{
+		Transport: h.openapi.transportFor(cluster.CaBundle.String),
+		Timeout:   30 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		writeError(c, http.StatusBadGateway, "k8s-error", err.Error())
@@ -130,9 +138,15 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024)) // 10 MiB cap
+	// Read one byte past the cap so we can distinguish "exactly at limit" from
+	// "overflowed the limit" — io.LimitReader silently truncates otherwise.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, int64(openapiMaxBytes)+1))
 	if err != nil {
 		writeError(c, http.StatusBadGateway, "k8s-error", err.Error())
+		return
+	}
+	if len(body) > openapiMaxBytes {
+		writeError(c, http.StatusBadGateway, "k8s-error", "OpenAPI response exceeds 10MiB limit")
 		return
 	}
 	if resp.StatusCode >= 400 {

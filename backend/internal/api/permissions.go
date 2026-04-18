@@ -33,13 +33,9 @@ func (h *Handlers) ensureTemplateEditor(c *gin.Context, name string) (store.Temp
 		return store.Template{}, false
 	}
 
-	user, err := h.deps.Store.UpsertUser(c, store.UpsertUserParams{
-		OidcSubject: u.Subject,
-		Email:       store.PgText(u.Email),
-		DisplayName: store.PgText(u.Name),
-	})
+	user, err := h.deps.Store.GetUserByOidcSubject(c, u.Subject)
 	if err != nil {
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
+		writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
 		return store.Template{}, false
 	}
 
