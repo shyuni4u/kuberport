@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strconv"
 
 	"kuberport/internal/api"
 	"kuberport/internal/auth"
@@ -31,6 +32,7 @@ func main() {
 		OIDCIssuer:          os.Getenv("OIDC_ISSUER"),
 		OIDCAudience:        os.Getenv("OIDC_AUDIENCE"),
 		AppEncryptionKeyB64: os.Getenv("APP_ENCRYPTION_KEY_B64"),
+		OpenAPICacheMax:     getenvInt("KBP_OPENAPI_CACHE_MAX", 64),
 	}
 
 	if cfg.OIDCIssuer == "" || cfg.OIDCAudience == "" {
@@ -65,6 +67,16 @@ func main() {
 func getenv(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
+	}
+	return def
+}
+
+func getenvInt(k string, def int) int {
+	if v := os.Getenv(k); v != "" {
+		n, err := strconv.Atoi(v)
+		if err == nil {
+			return n
+		}
 	}
 	return def
 }
