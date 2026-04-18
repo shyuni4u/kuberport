@@ -102,6 +102,10 @@ func (h *Handlers) ListTeamMembers(c *gin.Context) {
 
 	// Admin can list any team. Non-admins must be members of the target team.
 	if !isKuberportAdmin(u) {
+		// GetUserByOidcSubject can fail because the caller never hit /v1/me
+		// (the warm-up / upsert endpoint) OR because they simply aren't a team
+		// member. Either way the correct response is 403 — we deliberately do
+		// not upsert here to keep reads off the write path (see PR #11 review).
 		caller, err := h.deps.Store.GetUserByOidcSubject(c, u.Subject)
 		if err != nil {
 			writeError(c, http.StatusForbidden, "rbac-denied", "team member or kuberport-admin required")
