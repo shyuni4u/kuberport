@@ -34,5 +34,13 @@ SELECT r.*, c.name AS cluster_name, c.api_url AS cluster_api_url, c.ca_bundle AS
 INSERT INTO releases (name, template_version_id, cluster_id, namespace, values_json, rendered_yaml, created_by_user_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
 
+-- name: UpdateReleaseValuesAndVersion :exec
+UPDATE releases
+   SET template_version_id = $2,
+       values_json = $3,
+       rendered_yaml = $4,
+       updated_at = NOW()
+ WHERE id = $1;
+
 -- name: DeleteRelease :exec
 DELETE FROM releases WHERE id = $1;

@@ -241,3 +241,29 @@ func (q *Queries) ListReleasesForUser(ctx context.Context, arg ListReleasesForUs
 	}
 	return items, nil
 }
+
+const updateReleaseValuesAndVersion = `-- name: UpdateReleaseValuesAndVersion :exec
+UPDATE releases
+   SET template_version_id = $2,
+       values_json = $3,
+       rendered_yaml = $4,
+       updated_at = NOW()
+ WHERE id = $1
+`
+
+type UpdateReleaseValuesAndVersionParams struct {
+	ID                pgtype.UUID `json:"id"`
+	TemplateVersionID pgtype.UUID `json:"template_version_id"`
+	ValuesJson        []byte      `json:"values_json"`
+	RenderedYaml      string      `json:"rendered_yaml"`
+}
+
+func (q *Queries) UpdateReleaseValuesAndVersion(ctx context.Context, arg UpdateReleaseValuesAndVersionParams) error {
+	_, err := q.db.Exec(ctx, updateReleaseValuesAndVersion,
+		arg.ID,
+		arg.TemplateVersionID,
+		arg.ValuesJson,
+		arg.RenderedYaml,
+	)
+	return err
+}

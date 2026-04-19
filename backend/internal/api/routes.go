@@ -63,6 +63,7 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 	v.POST("/releases", h.CreateRelease)
 	v.GET("/releases/:id", h.GetRelease)
 	v.GET("/releases/:id/logs", h.StreamReleaseLogs)
+	v.PUT("/releases/:id", h.UpdateRelease)
 	v.DELETE("/releases/:id", h.DeleteRelease)
 	v.GET("/teams", h.ListTeams)
 	v.POST("/teams", requireAdmin(), h.CreateTeam)
