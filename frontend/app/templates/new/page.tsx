@@ -10,7 +10,21 @@ import { EditorLayout } from "@/components/editor/EditorLayout";
 import { MetaRow, TemplateMeta } from "@/components/editor/MetaRow";
 import { BottomBar } from "@/components/editor/BottomBar";
 import { YamlEditor } from "@/components/YamlEditor";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { findKindSchema, OpenAPISchemaDoc, SchemaNode } from "@/lib/openapi";
+
+type Team = { id: string; name: string };
+
+// Sentinel used by the team <Select>. shadcn's Select disallows value="" on
+// SelectItem (base-ui rejects empty strings), so the "global" option uses
+// this placeholder and is mapped back to "" when submitted.
+const GLOBAL_TEAM = "__global__";
 
 interface EditedResource {
   gv: string;
@@ -42,6 +56,8 @@ function UIModeNew() {
   const router = useRouter();
   const [clusters, setClusters] = useState<Array<{ name: string }>>([]);
   const [cluster, setCluster] = useState<string>("");
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [owningTeamId, setOwningTeamId] = useState<string>("");
   const [resources, setResources] = useState<EditedResource[]>([]);
   const [active, setActive] = useState<{ resIdx: number; path: string; node: SchemaNode } | null>(null);
   const [meta, setMeta] = useState<TemplateMeta>({ name: "", tags: [] });
@@ -51,11 +67,22 @@ function UIModeNew() {
 
   useEffect(() => {
     (async () => {
-      const cRes = await fetch("/api/v1/clusters");
-      if (cRes.ok) {
-        const d = await cRes.json() as { clusters: Array<{ name: string }> };
-        setClusters(d.clusters);
-        if (d.clusters[0]) setCluster(d.clusters[0].name);
+      try {
+        const [cRes, tRes] = await Promise.all([
+          fetch("/api/v1/clusters"),
+          fetch("/api/v1/teams"),
+        ]);
+        if (cRes.ok) {
+          const d = await cRes.json() as { clusters: Array<{ name: string }> };
+          setClusters(d.clusters);
+          if (d.clusters[0]) setCluster(d.clusters[0].name);
+        }
+        if (tRes.ok) {
+          const d = await tRes.json() as { teams: Team[] };
+          setTeams(d.teams ?? []);
+        }
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
       }
     })();
   }, []);
@@ -98,9 +125,6 @@ function UIModeNew() {
       // TODO(v1.1): MetaRow does not expose a display_name input yet.
       // Fall back to the slug so the backend's required field is satisfied.
       const displayName = meta.display_name?.trim() || meta.name;
-      // TODO(v1.1): MetaRow's `team` field is a free-text input but the
-      // backend requires owning_team_id (UUID). For now we always create
-      // global templates; a team picker will resolve name → UUID later.
       const res = await fetch("/api/v1/templates", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -109,7 +133,7 @@ function UIModeNew() {
           display_name: displayName,
           tags: meta.tags,
           authoring_mode: "ui",
-          owning_team_id: "",
+          owning_team_id: owningTeamId,
           ui_state: uiState,
         }),
       });
@@ -178,6 +202,25 @@ function UIModeNew() {
   return (
     <div className="space-y-3">
       <MetaRow meta={meta} onChange={setMeta} />
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-slate-600">소유 팀</span>
+        <Select
+          value={owningTeamId === "" ? GLOBAL_TEAM : owningTeamId}
+          onValueChange={(v) => setOwningTeamId(!v || v === GLOBAL_TEAM ? "" : v)}
+        >
+          <SelectTrigger className="w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={GLOBAL_TEAM}>(글로벌 — admin 전용)</SelectItem>
+            {teams.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <EditorLayout tree={tree} inspector={inspector} preview={preview} />
       {err && <div className="text-red-600 text-sm whitespace-pre">{err}</div>}
       <BottomBar
@@ -222,10 +265,26 @@ const STARTER_UISPEC = `fields:
 function YamlModeNew() {
   const router = useRouter();
   const [meta, setMeta] = useState<TemplateMeta>({ name: "", tags: [] });
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [owningTeamId, setOwningTeamId] = useState<string>("");
   const [resourcesYaml, setResourcesYaml] = useState(STARTER_RESOURCES);
   const [uispecYaml, setUispecYaml] = useState(STARTER_UISPEC);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const tRes = await fetch("/api/v1/teams");
+        if (tRes.ok) {
+          const d = await tRes.json() as { teams: Team[] };
+          setTeams(d.teams ?? []);
+        }
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+      }
+    })();
+  }, []);
 
   const canSave = meta.name.trim().length > 0 && !saving;
 
@@ -242,7 +301,7 @@ function YamlModeNew() {
           display_name: displayName,
           tags: meta.tags,
           authoring_mode: "yaml",
-          owning_team_id: "",
+          owning_team_id: owningTeamId,
           resources_yaml: resourcesYaml,
           ui_spec_yaml: uispecYaml,
         }),
@@ -258,6 +317,25 @@ function YamlModeNew() {
   return (
     <div className="space-y-3">
       <MetaRow meta={meta} onChange={setMeta} />
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-slate-600">소유 팀</span>
+        <Select
+          value={owningTeamId === "" ? GLOBAL_TEAM : owningTeamId}
+          onValueChange={(v) => setOwningTeamId(!v || v === GLOBAL_TEAM ? "" : v)}
+        >
+          <SelectTrigger className="w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={GLOBAL_TEAM}>(글로벌 — admin 전용)</SelectItem>
+            {teams.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <YamlEditor label="resources.yaml" value={resourcesYaml} onChange={setResourcesYaml} />
         <YamlEditor label="ui-spec.yaml" value={uispecYaml} onChange={setUispecYaml} />

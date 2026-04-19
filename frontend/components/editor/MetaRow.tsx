@@ -15,10 +15,18 @@ type Props = {
   meta: TemplateMeta;
   onChange: (m: TemplateMeta) => void;
   nameLocked?: boolean;
+  /**
+   * When true, all fields (name, team, tags) are rendered read-only. Used on
+   * the version-edit page where the backend has no endpoint for updating
+   * parent-template metadata (display_name/tags), so exposing these as
+   * editable would silently drop the user's changes on save.
+   */
+  readOnly?: boolean;
 };
 
-export function MetaRow({ meta, onChange, nameLocked }: Props) {
+export function MetaRow({ meta, onChange, nameLocked, readOnly }: Props) {
   const [tagInput, setTagInput] = useState("");
+  const lockAll = readOnly === true;
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-md border bg-slate-50 px-4 py-2">
@@ -27,7 +35,7 @@ export function MetaRow({ meta, onChange, nameLocked }: Props) {
         <Input
           className="w-48 text-sm"
           value={meta.name}
-          disabled={nameLocked}
+          disabled={nameLocked || lockAll}
           onChange={(e) => onChange({ ...meta, name: e.target.value })}
         />
       </label>
@@ -36,6 +44,7 @@ export function MetaRow({ meta, onChange, nameLocked }: Props) {
         <Input
           className="w-32 text-sm"
           value={meta.team ?? ""}
+          disabled={lockAll}
           onChange={(e) => onChange({ ...meta, team: e.target.value })}
         />
       </label>
@@ -43,37 +52,41 @@ export function MetaRow({ meta, onChange, nameLocked }: Props) {
         {meta.tags.map((t) => (
           <Badge key={t} variant="secondary" className="text-[10px]">
             {t}
-            <button
-              type="button"
-              aria-label={`remove tag ${t}`}
-              className="ml-1 opacity-60 hover:opacity-100"
-              onClick={() =>
-                onChange({
-                  ...meta,
-                  tags: meta.tags.filter((x) => x !== t),
-                })
-              }
-            >
-              ×
-            </button>
+            {!lockAll && (
+              <button
+                type="button"
+                aria-label={`remove tag ${t}`}
+                className="ml-1 opacity-60 hover:opacity-100"
+                onClick={() =>
+                  onChange({
+                    ...meta,
+                    tags: meta.tags.filter((x) => x !== t),
+                  })
+                }
+              >
+                ×
+              </button>
+            )}
           </Badge>
         ))}
-        <Input
-          placeholder="태그 추가"
-          className="h-7 w-28 text-xs"
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && tagInput.trim()) {
-              e.preventDefault();
-              const next = tagInput.trim();
-              if (!meta.tags.includes(next)) {
-                onChange({ ...meta, tags: [...meta.tags, next] });
+        {!lockAll && (
+          <Input
+            placeholder="태그 추가"
+            className="h-7 w-28 text-xs"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && tagInput.trim()) {
+                e.preventDefault();
+                const next = tagInput.trim();
+                if (!meta.tags.includes(next)) {
+                  onChange({ ...meta, tags: [...meta.tags, next] });
+                }
+                setTagInput("");
               }
-              setTagInput("");
-            }
-          }}
-        />
+            }}
+          />
+        )}
       </div>
     </div>
   );

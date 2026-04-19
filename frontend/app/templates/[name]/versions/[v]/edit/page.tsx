@@ -48,31 +48,35 @@ function UIModeEdit() {
 
   useEffect(() => {
     (async () => {
-      const [vRes, tRes, cRes] = await Promise.all([
-        fetch(`/api/v1/templates/${name}/versions/${v}`),
-        fetch(`/api/v1/templates/${name}`),
-        fetch("/api/v1/clusters"),
-      ]);
-      if (!vRes.ok) { setErr(await vRes.text()); return; }
-      const ver = await vRes.json() as { authoring_mode: string; ui_state_json: UIModeTemplate };
-      if (ver.authoring_mode !== "ui") {
-        setErr("이 버전은 YAML 모드로 작성되어 UI 에디터에서 열 수 없습니다.");
-        return;
-      }
-      setState(ver.ui_state_json);
+      try {
+        const [vRes, tRes, cRes] = await Promise.all([
+          fetch(`/api/v1/templates/${name}/versions/${v}`),
+          fetch(`/api/v1/templates/${name}`),
+          fetch("/api/v1/clusters"),
+        ]);
+        if (!vRes.ok) { setErr(await vRes.text()); return; }
+        const ver = await vRes.json() as { authoring_mode: string; ui_state_json: UIModeTemplate };
+        if (ver.authoring_mode !== "ui") {
+          setErr("이 버전은 YAML 모드로 작성되어 UI 에디터에서 열 수 없습니다.");
+          return;
+        }
+        setState(ver.ui_state_json);
 
-      if (tRes.ok) {
-        const t = await tRes.json() as TemplateMetaFromAPI;
-        setMeta({
-          name: t.name,
-          display_name: t.display_name,
-          tags: t.tags ?? [],
-        });
-      }
+        if (tRes.ok) {
+          const t = await tRes.json() as TemplateMetaFromAPI;
+          setMeta({
+            name: t.name,
+            display_name: t.display_name,
+            tags: t.tags ?? [],
+          });
+        }
 
-      if (cRes.ok) {
-        const d = await cRes.json() as { clusters: Array<{ name: string }> };
-        if (d.clusters[0]) setCluster(d.clusters[0].name);
+        if (cRes.ok) {
+          const d = await cRes.json() as { clusters: Array<{ name: string }> };
+          if (d.clusters[0]) setCluster(d.clusters[0].name);
+        }
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
       }
     })();
   }, [name, v]);
@@ -110,6 +114,11 @@ function UIModeEdit() {
     if (!state) return;
     setSaving(true);
     try {
+      // Only the version payload is persisted: POST /v1/templates/:name/versions
+      // writes a new row into template_versions (ui_state_json, authoring_mode,
+      // etc.). Parent-template metadata (display_name, tags) lives on the
+      // `templates` row and has no update endpoint today, so MetaRow is rendered
+      // read-only above — there is nothing to send here for those fields.
       const res = await fetch(`/api/v1/templates/${name}/versions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -178,7 +187,7 @@ function UIModeEdit() {
 
   return (
     <div className="space-y-3">
-      <MetaRow meta={meta} onChange={setMeta} nameLocked />
+      <MetaRow meta={meta} onChange={setMeta} nameLocked readOnly />
       <EditorLayout tree={tree} inspector={inspector} preview={preview} />
       {err && <div className="text-red-600 text-sm mt-2">{err}</div>}
       <BottomBar
