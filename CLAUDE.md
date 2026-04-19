@@ -5,11 +5,23 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 
 ## 현재 단계
 
-**Plan 1·2 머지 완료 — 프론트엔드 재설계 스펙 v0.1 작성됨**.
-- 초기 디자인: [docs/superpowers/specs/2026-04-16-initial-design.md](docs/superpowers/specs/2026-04-16-initial-design.md)
-- Plan 2 Admin UX: [docs/superpowers/specs/2026-04-18-plan2-admin-ux-design.md](docs/superpowers/specs/2026-04-18-plan2-admin-ux-design.md)
-- **프론트 디자인 v0.1 (구현 타겟)**: [docs/superpowers/specs/2026-04-19-frontend-design-spec.md](docs/superpowers/specs/2026-04-19-frontend-design-spec.md) — 4 화면 (Admin UI 에디터 / 카탈로그 / 배포 폼 / 릴리스 상세)
-- 다음 단계: `superpowers:writing-plans` 스킬 호출 → `docs/superpowers/plans/` 아래에 구현 계획 생성 (화면 단위로 분할 예정)
+**프론트엔드 재설계 스펙 v0.1 + 구현 플랜 5개 작성 완료 — 실행 대기**.
+
+스펙: [docs/superpowers/specs/2026-04-19-frontend-design-spec.md](docs/superpowers/specs/2026-04-19-frontend-design-spec.md) (4 화면: Admin UI 에디터 / 카탈로그 / 배포 폼 / 릴리스 상세)
+
+플랜 (순서대로 실행 — Plan 0 은 1-4 의 공통 기반):
+
+| # | 플랜 | 범위 |
+|---|---|---|
+| 0 | [frontend-foundation](docs/superpowers/plans/2026-04-19-frontend-foundation.md) | 패키지·shadcn·Vitest·RoleBadge·StatusChip·TopBar 재편·Providers·Zustand·MonacoPanel |
+| 1 | [catalog-redesign](docs/superpowers/plans/2026-04-19-catalog-redesign.md) | `/catalog` + CatalogCard + 검색/태그 필터 + 아이콘 맵 |
+| 2 | [release-detail-redesign](docs/superpowers/plans/2026-04-19-release-detail-redesign.md) | 중첩 라우트 + 개요·로그 탭 + **SSE 백엔드 추가** + k8s 용어 토글 |
+| 3 | [deploy-form-redesign](docs/superpowers/plans/2026-04-19-deploy-form-redesign.md) | **백엔드 3개 엔드포인트** (render/PUT releases/SSAR) + shadcn DynamicForm + RBAC 패널 + 업데이트 플로우 |
+| 4 | [admin-editor-redesign](docs/superpowers/plans/2026-04-19-admin-editor-redesign.md) | ResizablePanelGroup + MetaRow + BottomBar + SchemaTree 배지 + FieldInspector enum values + ?mode=ui\|yaml 분기 |
+
+참고 — 초기 디자인: [2026-04-16-initial-design.md](docs/superpowers/specs/2026-04-16-initial-design.md), Plan 2 Admin UX: [2026-04-18-plan2-admin-ux-design.md](docs/superpowers/specs/2026-04-18-plan2-admin-ux-design.md).
+
+각 플랜은 `superpowers:subagent-driven-development` 또는 `superpowers:executing-plans` 로 실행. 실행 전 **별도 워크트리** 생성 권장 (각 플랜이 frontend/backend 양쪽 건드림 — 현재 docs 워크트리에 섞지 말 것).
 
 ## 확정된 결정 (요약)
 
