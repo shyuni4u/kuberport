@@ -19,6 +19,7 @@ export interface SchemaNode {
   items?: SchemaNode;
   enum?: Array<string | number>;
   $ref?: string;
+  allOf?: SchemaNode[];
   "x-kubernetes-group-version-kind"?: Array<{ group: string; version: string; kind: string }>;
 }
 
@@ -45,7 +46,10 @@ export function findKindSchema(doc: OpenAPISchemaDoc, group: string, version: st
   return null;
 }
 
-/** Resolve all $ref entries inline (best-effort, cycles break into {$ref} leaves). */
+/** Resolve all $ref and allOf entries inline (best-effort; cycles break into
+ *  {$ref} leaves). Kubernetes OpenAPI wraps refs with `allOf: [{$ref}]` so
+ *  it can attach a per-field description/default — we merge those back into
+ *  the parent node here. */
 export function resolveRefs(node: SchemaNode, schemas: Record<string, SchemaNode>, seen = new Set<string>()): SchemaNode {
   if (node.$ref) {
     const name = node.$ref.replace(/^#\/components\/schemas\//, "");
@@ -53,6 +57,32 @@ export function resolveRefs(node: SchemaNode, schemas: Record<string, SchemaNode
     const target = schemas[name];
     if (!target) return node;
     return resolveRefs(target, schemas, new Set(seen).add(name));
+  }
+  if (node.allOf && node.allOf.length > 0) {
+    // Merge each allOf entry into the node; the node's own type/description
+    // wins over the allOf target's (that's why description lives on the
+    // parent in k8s OpenAPI).
+    let merged: SchemaNode = {};
+    for (const sub of node.allOf) {
+      // Clone `seen` per-branch so sibling allOf entries don't interfere with
+      // each other's cycle detection (an inner $ref already clones, but a
+      // pathological allOf chain with no $ref would share the parent set).
+      const r = resolveRefs(sub, schemas, new Set(seen));
+      merged = {
+        ...merged,
+        ...r,
+        properties: { ...(merged.properties ?? {}), ...(r.properties ?? {}) },
+      };
+    }
+    const parentWithoutAllOf: SchemaNode = { ...node };
+    delete parentWithoutAllOf.allOf;
+    const combined: SchemaNode = {
+      ...merged,
+      ...parentWithoutAllOf,
+      properties: { ...(merged.properties ?? {}), ...(parentWithoutAllOf.properties ?? {}) },
+    };
+    // Recurse so inner $refs/allOfs inside properties/items also resolve.
+    return resolveRefs(combined, schemas, seen);
   }
   const out: SchemaNode = { ...node };
   if (node.properties) {

@@ -13,8 +13,10 @@ export default async function TeamDetailPage({
   ]);
   if (!membersRes.ok) throw new Error(await membersRes.text());
   if (!teamsRes.ok) throw new Error(await teamsRes.text());
+  // Backend serializes pgtype.Text as a plain string (or null), not the
+  // {String, Valid} envelope an earlier version of this type assumed.
   const { members } = await membersRes.json() as {
-    members: Array<{ user_id: string; role: string; email: {String:string;Valid:boolean}; user_display_name: {String:string;Valid:boolean} }>;
+    members: Array<{ user_id: string; role: string; email: string | null; user_display_name: string | null }> | null;
   };
   const { teams } = await teamsRes.json() as { teams: Array<{ id: string; name: string }> };
   const team = teams.find(t => t.id === id);
@@ -51,9 +53,9 @@ export default async function TeamDetailPage({
           <tr><th className="p-2 text-left">이메일</th><th className="p-2 text-left">역할</th><th className="p-2"></th></tr>
         </thead>
         <tbody>
-          {members.map(m => (
+          {(members ?? []).map(m => (
             <tr key={m.user_id} className="border-t">
-              <td className="p-2">{m.email?.Valid ? m.email.String : m.user_id}</td>
+              <td className="p-2">{m.email ?? m.user_id}</td>
               <td className="p-2">{m.role}</td>
               <td className="p-2">
                 <form action={removeMember}>
