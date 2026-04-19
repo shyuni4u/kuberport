@@ -8,6 +8,13 @@
 
 **Tech Stack:** 기존 + Plan 0 산출물 (`RoleBadge` 참조만, `Badge`/`ToggleGroup`/`Input` 사용), `lucide-react` 아이콘, TanStack Query 는 **쓰지 않음** (첫 로드는 서버에서, 이후 필터는 클라 상태로 충분).
 
+> **Base UI vs Radix (중요)** — `components/ui/toggle-group.tsx` 는 `@base-ui/react/toggle-group` 를 래핑한다 (Radix 가 아님). API 차이:
+> - `value`: `readonly string[]` (배열, not 단일 string)
+> - `onValueChange`: `(groupValue: string[], ...) => void`
+> - `type="single"` prop 없음 — 대신 `multiple` boolean (default `false` = single)
+>
+> 따라서 single-select 패턴: `value={tag ? [tag] : []}` / `onValueChange={(v) => setTag(v[0] ?? "")}`. Plan 2-4 에서도 동일 규칙 적용.
+
 **스펙 참조:** [2026-04-19-frontend-design-spec.md](../specs/2026-04-19-frontend-design-spec.md) §4.
 
 **전제:** Plan 0 (foundation) 이 완료되어 있어야 한다 (shadcn ToggleGroup · Input · Badge, Vitest 인프라, RoleBadge·StatusChip).
@@ -345,17 +352,17 @@ export function CatalogBrowser({ templates }: Props) {
       </div>
       {allTags.length > 0 && (
         <ToggleGroup
-          type="single"
-          value={tag}
-          onValueChange={(v) => setTag(v || "")}
+          value={tag ? [tag] : []}
+          onValueChange={(v) => setTag(v[0] ?? "")}
           className="flex-wrap justify-start"
         >
-          <ToggleGroupItem value="">전체</ToggleGroupItem>
           {allTags.map((t) => (
             <ToggleGroupItem key={t} value={t}>{t}</ToggleGroupItem>
           ))}
         </ToggleGroup>
       )}
+      {/* Note: Base UI ToggleGroup — value is string[], no "전체" reset item.
+          Users clear the filter by re-clicking the active tag. */}
       {filtered.length === 0 ? (
         <div className="py-12 text-center text-sm text-slate-500">
           일치하는 템플릿이 없습니다. 검색어나 태그 필터를 바꿔보세요.
