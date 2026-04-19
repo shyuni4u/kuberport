@@ -5,10 +5,11 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 
 ## 현재 단계
 
-**디자인 스펙 작성 완료 — 사용자 리뷰 대기**.
-- 초안: [docs/superpowers/specs/2026-04-16-initial-design.md](docs/superpowers/specs/2026-04-16-initial-design.md) v0.1
-- 승인 시 `writing-plans` 스킬 호출 → `docs/superpowers/plans/` 아래에 구현 계획 생성
-- 그 전까지 프로젝트 코드(`package.json`, `go.mod`, `src/` 등) 스캐폴딩 금지
+**Plan 1·2 머지 완료 — 프론트엔드 재설계 스펙 v0.1 작성됨**.
+- 초기 디자인: [docs/superpowers/specs/2026-04-16-initial-design.md](docs/superpowers/specs/2026-04-16-initial-design.md)
+- Plan 2 Admin UX: [docs/superpowers/specs/2026-04-18-plan2-admin-ux-design.md](docs/superpowers/specs/2026-04-18-plan2-admin-ux-design.md)
+- **프론트 디자인 v0.1 (구현 타겟)**: [docs/superpowers/specs/2026-04-19-frontend-design-spec.md](docs/superpowers/specs/2026-04-19-frontend-design-spec.md) — 4 화면 (Admin UI 에디터 / 카탈로그 / 배포 폼 / 릴리스 상세)
+- 다음 단계: `superpowers:writing-plans` 스킬 호출 → `docs/superpowers/plans/` 아래에 구현 계획 생성 (화면 단위로 분할 예정)
 
 ## 확정된 결정 (요약)
 
