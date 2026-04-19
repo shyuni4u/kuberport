@@ -13,12 +13,12 @@ type ApiTemplate = {
 };
 
 export default async function CatalogPage() {
-  const data = await apiFetch("/v1/templates")
-    .then((r) => (r.ok ? r.json() : { templates: [] }))
-    .catch(() => ({ templates: [] }));
+  const res = await apiFetch("/v1/templates");
+  if (!res.ok) throw new Error(await res.text());
+  const data = (await res.json()) as { templates: ApiTemplate[] };
 
-  const templates: CatalogCardTemplate[] = (data.templates as ApiTemplate[])
-    .filter((t) => t.current_status === "published" && t.current_version != null)
+  const templates: CatalogCardTemplate[] = data.templates
+    .filter((t: ApiTemplate) => t.current_status === "published" && t.current_version != null)
     .map((t) => ({
       name: t.name,
       display_name: t.display_name,
