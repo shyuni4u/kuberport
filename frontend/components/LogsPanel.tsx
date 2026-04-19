@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type LogEntry = { time: number; pod: string; text: string };
+type LogEntry = { id: number; time: number; pod: string; text: string; kind?: "log" | "error" };
 
 type Props = { releaseId: string; instances: { name: string }[] };
 
@@ -100,20 +100,38 @@ function Stream({ releaseId, instance, autoscroll }: StreamProps) {
   const [lines, setLines] = useState<LogEntry[]>([]);
   const [status, setStatus] = useState<Status>("connecting");
   const boxRef = useRef<HTMLDivElement>(null);
+  // Monotonic id for stable React keys. Sliced lines (LINE_CAP) keep
+  // their original id, so reconciliation only re-renders the new row.
+  const seqRef = useRef(0);
 
   useEffect(() => {
     const es = new EventSource(
       `/api/v1/releases/${releaseId}/logs?instance=${encodeURIComponent(instance)}`,
     );
+    const append = (entry: Omit<LogEntry, "id">) => {
+      seqRef.current += 1;
+      const next: LogEntry = { id: seqRef.current, ...entry };
+      setLines((prev) => {
+        const trimmed = prev.length >= LINE_CAP ? prev.slice(-LINE_CAP + 1) : prev;
+        return [...trimmed, next];
+      });
+    };
     es.addEventListener("log", (e: MessageEvent) => {
       try {
-        const entry = JSON.parse(e.data) as LogEntry;
-        setLines((prev) => {
-          const next = prev.length >= LINE_CAP ? prev.slice(-LINE_CAP + 1) : prev;
-          return [...next, entry];
-        });
+        const data = JSON.parse(e.data) as { time: number; pod: string; text: string };
+        append({ ...data, kind: "log" });
       } catch {
-        /* ignore malformed line */
+        /* malformed line — drop */
+      }
+    });
+    // Backend emits named "error" events with {error: string}. EventSource
+    // .onerror catches connection errors only, not server-sent named events.
+    es.addEventListener("error", (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data) as { error: string };
+        append({ time: Date.now(), pod: "kuberport", text: data.error, kind: "error" });
+      } catch {
+        /* connection-level error — handled by onerror below */
       }
     });
     es.onopen = () => setStatus("connected");
@@ -147,8 +165,11 @@ function Stream({ releaseId, instance, autoscroll }: StreamProps) {
         ref={boxRef}
         className="h-[60vh] overflow-auto rounded bg-slate-950 p-3 font-mono text-[12px] leading-relaxed text-slate-100"
       >
-        {lines.map((l, idx) => (
-          <div key={idx} className="whitespace-pre">
+        {lines.map((l) => (
+          <div
+            key={l.id}
+            className={`whitespace-pre ${l.kind === "error" ? "text-red-300" : ""}`}
+          >
             <span className="text-slate-500">
               [{new Date(l.time).toLocaleTimeString()}]
             </span>{" "}
