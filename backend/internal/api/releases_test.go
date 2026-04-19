@@ -366,6 +366,21 @@ func TestReleases_List_NonAdminSeesOnlyOwn(t *testing.T) {
 	require.Empty(t, userList["releases"])
 }
 
+func TestReleases_Create_DeprecatedVersionRejected(t *testing.T) {
+	r, _ := newTestRouterWithK8s(t)
+	clusterName := seedCluster(t, r)
+	tplName := seedPublishedTemplate(t, r)
+
+	// deprecate v1
+	w := do(t, r, http.MethodPost, "/v1/templates/"+tplName+"/versions/1/deprecate", nil)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	body := []byte(`{"template":"` + tplName + `","version":1,"cluster":"` + clusterName + `","namespace":"default","name":"r-` + randSuffix() + `","values":{}}`)
+	w = do(t, r, http.MethodPost, "/v1/releases", bytes.NewReader(body))
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Contains(t, w.Body.String(), "deprecated")
+}
+
 func TestReleases_Create_InvalidNameReturns400(t *testing.T) {
 	r, _ := newTestRouterWithK8s(t)
 	clusterName := seedCluster(t, r)

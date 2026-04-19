@@ -93,6 +93,11 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 		writeError(c, http.StatusNotFound, "not-found", "template version")
 		return
 	}
+	if tv.Status == "deprecated" {
+		writeError(c, http.StatusBadRequest, "validation-error",
+			"template "+r.Template+" v"+strconv.Itoa(int(tv.Version))+" is deprecated; pick a non-deprecated version")
+		return
+	}
 	if tv.Status != "published" {
 		writeError(c, http.StatusConflict, "conflict", "version not published")
 		return
