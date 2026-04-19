@@ -5,7 +5,8 @@ import { apiFetch } from "@/lib/api-server";
 export default async function AdminTeamsPage() {
   const res = await apiFetch("/v1/teams");
   if (!res.ok) throw new Error(`팀 조회 실패: ${res.status} ${await res.text()}`);
-  const { teams } = await res.json() as { teams: Array<{id:string; name:string; display_name:{String:string;Valid:boolean}}> };
+  // Backend serializes pgtype.Text as a plain string (or null).
+  const { teams } = await res.json() as { teams: Array<{ id: string; name: string; display_name: string | null }> };
 
   async function createTeam(formData: FormData) {
     "use server";
@@ -33,7 +34,7 @@ export default async function AdminTeamsPage() {
         {teams.map(t => (
           <li key={t.id}>
             <Link href={`/admin/teams/${t.id}`} className="text-blue-600">
-              {t.display_name?.Valid ? t.display_name.String : t.name}
+              {t.display_name ?? t.name}
             </Link>
             <span className="text-xs text-slate-500 ml-2">{t.name}</span>
           </li>

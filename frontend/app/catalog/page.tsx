@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-server";
 
+// Backend serializes pgtype.Text/Int4 as plain values (or null), not the
+// {String, Valid} / {Int32, Valid} envelopes an earlier version of these
+// types assumed.
 interface TemplateRow {
   name: string;
   display_name: string;
-  description: { String: string; Valid: boolean };
-  current_version: { Int32: number; Valid: boolean };
-  // Plan 2 additions (backend returns these via ListTemplates join): current_status may be
-  // absent for legacy rows; treat missing as "unknown" and include.
-  current_status?: { String: string; Valid: boolean };
+  description: string | null;
+  current_version: number | null;
+  current_status?: string | null;
 }
 
 export default async function CatalogPage() {
@@ -16,7 +17,7 @@ export default async function CatalogPage() {
   if (!res.ok) throw new Error(await res.text());
   const { templates } = await res.json() as { templates: TemplateRow[] };
 
-  const visible = templates.filter(t => !(t.current_status?.Valid && t.current_status.String === "deprecated"));
+  const visible = templates.filter(t => t.current_status !== "deprecated");
 
   return (
     <div>
@@ -26,10 +27,10 @@ export default async function CatalogPage() {
           <div key={t.name} className="bg-white border rounded p-4">
             <div className="font-semibold">{t.display_name}</div>
             <div className="text-sm text-slate-600 mb-2">
-              {t.description?.Valid ? t.description.String : ""}
+              {t.description ?? ""}
             </div>
             <div className="text-xs text-slate-500 mb-3">
-              {t.current_version?.Valid ? `v${t.current_version.Int32}` : "아직 publish 안 됨"}
+              {t.current_version != null ? `v${t.current_version}` : "아직 publish 안 됨"}
             </div>
             <Link href={`/catalog/${t.name}/deploy`} className="text-blue-600 text-sm">
               배포

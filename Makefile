@@ -1,4 +1,4 @@
-.PHONY: compose-up compose-down test e2e
+.PHONY: compose-up compose-down test e2e e2e-ui
 
 compose-up:
 	docker compose -f deploy/docker/docker-compose.yml up -d
@@ -15,3 +15,8 @@ test:
 e2e: compose-up
 	cd backend && atlas schema apply --env local --auto-approve
 	cd backend && go test -tags=e2e ./e2e/... -v
+
+# Browser-level Plan 2 regression suite. Requires the full local-e2e.md
+# stack (compose + kind + backend + frontend dev) to be running first.
+e2e-ui:
+	cd frontend && pnpm test:e2e

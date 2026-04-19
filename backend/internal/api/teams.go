@@ -135,6 +135,9 @@ func (h *Handlers) ListTeamMembers(c *gin.Context) {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	if members == nil {
+		members = []store.ListTeamMembersRow{}
+	}
 	c.JSON(http.StatusOK, gin.H{"members": members})
 }
 
