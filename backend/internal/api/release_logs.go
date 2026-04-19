@@ -56,6 +56,12 @@ func (h *Handlers) StreamReleaseLogs(c *gin.Context) {
 	}
 
 	want := c.DefaultQuery("instance", "all")
+	// k8s pod name limit is 253; reject anything longer than that to
+	// avoid wasted work scanning the instance list.
+	if len(want) > 253 {
+		writeError(c, http.StatusBadRequest, "validation-error", "instance name too long")
+		return
+	}
 	var pods []string
 	for _, ins := range instances {
 		if want == "all" || want == ins.Name {

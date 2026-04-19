@@ -41,11 +41,23 @@ async function proxy(
   const ct = req.headers.get("content-type");
   if (ct) headers["Content-Type"] = ct;
 
-  const upstream = await fetch(url, {
-    method: req.method,
-    headers,
-    body: ["GET", "HEAD"].includes(req.method) ? undefined : await req.text(),
-  });
+  // Forward req.signal so browser disconnect (EventSource close, tab nav)
+  // cancels the upstream fetch — critical for SSE endpoints which would
+  // otherwise leak a per-pod goroutine in the Go backend on each disconnect.
+  let upstream: Response;
+  try {
+    upstream = await fetch(url, {
+      method: req.method,
+      headers,
+      body: ["GET", "HEAD"].includes(req.method) ? undefined : await req.text(),
+      signal: req.signal,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      return new NextResponse(null, { status: 499 });
+    }
+    throw e;
+  }
 
   return new NextResponse(upstream.body, {
     status: upstream.status,

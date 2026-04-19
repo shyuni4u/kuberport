@@ -258,8 +258,13 @@ func (h *Handlers) GetRelease(c *gin.Context) {
 }
 
 // respondReleaseOverview writes the release detail response.
-// If instances is nil, status is "unknown" (k8s unavailable).
+// If instances is nil, status is "unknown" (k8s unavailable). The
+// instances field is normalized to [] (never null) so JSON consumers
+// can call .map / .reduce without defensive coercion.
 func respondReleaseOverview(c *gin.Context, rel store.GetReleaseByIDRow, instances []k8s.Instance) {
+	if instances == nil {
+		instances = []k8s.Instance{}
+	}
 	ready := 0
 	for _, i := range instances {
 		if i.Ready {
