@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -93,43 +92,14 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 	}
 
 	// Auth: global templates (no owning team) require kuberport-admin.
-	// Team templates require admin OR an editor role in the target team.
-	if !isKuberportAdmin(u) {
-		if !owning.Valid {
+	// Team templates: delegate to ensureTeamEditor (admin OR team editor).
+	if !owning.Valid {
+		if !isKuberportAdmin(u) {
 			writeError(c, http.StatusForbidden, "rbac-denied", "global template requires kuberport-admin")
 			return
 		}
-		// A user not in the DB cannot possibly have a team_memberships row
-		// (FK constraint), so both "no user row" and "no membership row"
-		// resolve to the same "team editor required". System errors
-		// (DB down, etc.) bubble up as 500 so the caller doesn't get a
-		// misleading permission message.
-		caller, err := h.deps.Store.GetUserByOidcSubject(ctx, u.Subject)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
-				return
-			}
-			log.Printf("CreateTemplate: GetUserByOidcSubject: %v", err)
-			writeError(c, http.StatusInternalServerError, "internal", "failed to resolve caller")
-			return
-		}
-		mem, err := h.deps.Store.GetTeamMembership(ctx, store.GetTeamMembershipParams{
-			TeamID: owning, UserID: caller.ID,
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
-				return
-			}
-			log.Printf("CreateTemplate: GetTeamMembership: %v", err)
-			writeError(c, http.StatusInternalServerError, "internal", "failed to resolve membership")
-			return
-		}
-		if mem.Role != "editor" {
-			writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
-			return
-		}
+	} else if !h.ensureTeamEditor(c, owning) {
+		return
 	}
 
 	var uiStateJSON []byte
