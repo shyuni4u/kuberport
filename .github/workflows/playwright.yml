@@ -136,19 +136,20 @@ jobs:
           # in the node directly, e.g. crictl debug, benefits from resolution).
           docker exec kuberport-control-plane sh -c "echo '$GATEWAY host.docker.internal' >> /etc/hosts"
           # Wait for kubelet to pick up the manifest change and restart apiserver.
+          # A successful /healthz response means the apiserver came back up from
+          # the patched manifest — i.e. hostAliases is in effect. We don't exec
+          # into the pod to verify /etc/hosts because the apiserver image is
+          # distroless (no shell/cat).
           for i in $(seq 1 40); do
             if kubectl --context kind-kuberport get --raw /healthz 2>/dev/null | grep -q ok; then
               echo "apiserver healthy after patch (attempt $i)"
-              break
+              exit 0
             fi
             sleep 3
           done
-          # Confirm the patch landed in the running pod by sampling its /etc/hosts.
-          docker exec kuberport-control-plane sh -c '
-            set -e
-            CID=$(crictl ps -q --name kube-apiserver | head -1)
-            crictl exec "$CID" cat /etc/hosts
-          '
+          echo "apiserver did not recover after patch" >&2
+          docker exec kuberport-control-plane crictl ps -a >&2 || true
+          exit 1
 
       - name: Build backend
         run: cd backend && go build -o ../bin/kuberport-server ./cmd/server
