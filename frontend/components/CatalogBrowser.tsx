@@ -11,11 +11,10 @@ export function CatalogBrowser({ templates }: Props) {
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string>("");
 
-  const allTags = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of templates) for (const tg of t.tags) set.add(tg);
-    return Array.from(set).sort();
-  }, [templates]);
+  const allTags = useMemo(
+    () => Array.from(new Set(templates.flatMap((t) => t.tags))).sort(),
+    [templates],
+  );
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -39,7 +38,7 @@ export function CatalogBrowser({ templates }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">카탈로그</h1>
         <Input
           className="max-w-xs"
@@ -64,10 +63,7 @@ export function CatalogBrowser({ templates }: Props) {
           일치하는 템플릿이 없습니다. 검색어나 태그 필터를 바꿔보세요.
         </div>
       ) : (
-        <div
-          className="grid gap-3"
-          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}
-        >
+        <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
           {filtered.map((t) => (
             <CatalogCard key={t.name} template={t} />
           ))}
