@@ -85,6 +85,7 @@ export default function EditUITemplateVersion() {
                 schema={s}
                 selectedPath={active?.resIdx === i ? active.path : null}
                 onSelect={(p, n) => setActive({ resIdx: i, path: p, node: n })}
+                fields={r.fields as Record<string, { mode: "fixed" | "exposed" }>}
               /> : <div className="text-xs text-slate-400">스키마 로딩 중…</div>}
             </div>
           );

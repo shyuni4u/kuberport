@@ -109,6 +109,7 @@ export default function NewTemplatePage() {
                 schema={r.rootSchema}
                 selectedPath={active?.resIdx === i ? active.path : null}
                 onSelect={(p, n) => setActive({ resIdx: i, path: p, node: n })}
+                fields={r.fields}
               />
             </div>
           ))}
