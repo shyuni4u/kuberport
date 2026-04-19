@@ -90,6 +90,27 @@ func TestUpdateRelease_MissingValues(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 }
 
+// TestUpdateRelease_NullValues: values explicitly set to JSON null → 400.
+//
+// Gin's `binding:"required"` tag allows null through (it's "present"), which
+// would silently reset the release to template defaults. UpdateRelease
+// rejects it explicitly so this footgun can't hit.
+func TestUpdateRelease_NullValues(t *testing.T) {
+	r, fk := newTestRouterWithK8s(t)
+	clusterName := seedCluster(t, r)
+	tplName := seedPublishedTemplate(t, r)
+	id := createRelease(t, r, tplName, clusterName, "null-"+randSuffix(), map[string]any{
+		"Deployment[web].spec.replicas": 1,
+	})
+	appliedBefore := len(fk.applied)
+
+	w := do(t, r, http.MethodPut, "/v1/releases/"+id,
+		strings.NewReader(`{"version":1,"values":null}`))
+	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), "values must be a JSON object")
+	require.Len(t, fk.applied, appliedBefore, "null values must not reach k8s apply")
+}
+
 // TestUpdateRelease_Forbidden: non-admin, non-creator user → 403.
 //
 // Admin seeds the release (creator=admin), then a non-admin user (stubVerifier)

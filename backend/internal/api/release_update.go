@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -60,6 +61,14 @@ func (h *Handlers) UpdateRelease(c *gin.Context) {
 		return
 	}
 
+	// Gin's `required` tag treats `null` as "present". Reject it explicitly
+	// so a caller sending {"version":1,"values":null} can't silently reset
+	// a release to template defaults.
+	if len(req.Values) == 0 || bytes.Equal(bytes.TrimSpace(req.Values), []byte("null")) {
+		writeError(c, http.StatusBadRequest, "validation-error", "values must be a JSON object")
+		return
+	}
+
 	ctx := c.Request.Context()
 	u, _ := auth.UserFrom(ctx)
 
@@ -76,15 +85,8 @@ func (h *Handlers) UpdateRelease(c *gin.Context) {
 	}
 
 	// AuthZ: admin OR release creator (mirrors GetRelease / DeleteRelease).
-	if !isAdmin(c) {
-		user, ok := h.resolveUser(c)
-		if !ok {
-			return
-		}
-		if rel.CreatedByUserID != user.ID {
-			writeError(c, http.StatusForbidden, "rbac-denied", "not the release owner")
-			return
-		}
+	if !h.authorizeReleaseAccess(c, rel) {
+		return
 	}
 
 	// Resolve the target version FOR THIS release's template. Going through
@@ -104,13 +106,7 @@ func (h *Handlers) UpdateRelease(c *gin.Context) {
 		writeError(c, http.StatusInternalServerError, "internal", "failed to load template version")
 		return
 	}
-	if tv.Status == "deprecated" {
-		writeError(c, http.StatusBadRequest, "validation-error",
-			"template "+rel.TemplateName+" v"+strconv.Itoa(int(tv.Version))+" is deprecated; pick a non-deprecated version")
-		return
-	}
-	if tv.Status != "published" {
-		writeError(c, http.StatusConflict, "conflict", "version not published")
+	if !requireDeployableVersion(c, tv, rel.TemplateName) {
 		return
 	}
 
@@ -142,6 +138,15 @@ func (h *Handlers) UpdateRelease(c *gin.Context) {
 
 	// DB update. On failure, try to re-apply the OLD rendered_yaml so k8s
 	// reflects the committed DB state. Best-effort — log any rollback error.
+	//
+	// TODO(rollback-test): cover this branch with a unit test that forces
+	// UpdateReleaseValuesAndVersion to fail and asserts (a) response is 500,
+	// (b) fakeK8sApplier.applied contains the OLD rendered_yaml as its most
+	// recent entry. Requires either extracting a narrow Store interface for
+	// api.Deps (currently concrete *store.Store) or wrapping the pgxpool
+	// with a "fail-next-exec" shim — either is >30 lines across routes.go +
+	// test fixtures, outside Plan 3 Task 2's scope. Reviewer accepted a
+	// deferred TODO per the Task 2 review notes.
 	if err := h.deps.Store.UpdateReleaseValuesAndVersion(ctx, store.UpdateReleaseValuesAndVersionParams{
 		ID:                id,
 		TemplateVersionID: tv.ID,
