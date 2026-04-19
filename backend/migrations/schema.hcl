@@ -129,6 +129,10 @@ table "templates" {
     null    = false
     default = sql("now()")
   }
+  column "owning_team_id" {
+    type = uuid
+    null = true
+  }
   primary_key {
     columns = [column.id]
   }
@@ -146,6 +150,11 @@ table "templates" {
     ref_columns = [table.template_versions.column.id]
     on_delete   = SET_NULL
     on_update   = NO_ACTION
+  }
+  foreign_key "t_team_fk" {
+    columns     = [column.owning_team_id]
+    ref_columns = [table.teams.column.id]
+    on_delete   = SET_NULL
   }
 }
 
@@ -195,6 +204,15 @@ table "template_versions" {
   }
   column "published_at" {
     type = timestamptz
+    null = true
+  }
+  column "authoring_mode" {
+    type    = text
+    null    = false
+    default = "yaml"
+  }
+  column "ui_state_json" {
+    type = jsonb
     null = true
   }
   primary_key {
@@ -330,5 +348,71 @@ table "sessions" {
   }
   index "s_expires_at" {
     columns = [column.expires_at]
+  }
+}
+
+table "teams" {
+  schema = schema.public
+  column "id" {
+    type    = uuid
+    null    = false
+    default = sql("gen_random_uuid()")
+  }
+  column "name" {
+    type = text
+    null = false
+  }
+  column "display_name" {
+    type = text
+    null = true
+  }
+  column "created_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+  primary_key {
+    columns = [column.id]
+  }
+  index "teams_name_uq" {
+    columns = [column.name]
+    unique  = true
+  }
+}
+
+table "team_memberships" {
+  schema = schema.public
+  column "user_id" {
+    type = uuid
+    null = false
+  }
+  column "team_id" {
+    type = uuid
+    null = false
+  }
+  column "role" {
+    type = text
+    null = false
+  }
+  column "created_at" {
+    type    = timestamptz
+    null    = false
+    default = sql("now()")
+  }
+  primary_key {
+    columns = [column.user_id, column.team_id]
+  }
+  foreign_key "tm_user_fk" {
+    columns     = [column.user_id]
+    ref_columns = [table.users.column.id]
+    on_delete   = CASCADE
+  }
+  foreign_key "tm_team_fk" {
+    columns     = [column.team_id]
+    ref_columns = [table.teams.column.id]
+    on_delete   = CASCADE
+  }
+  index "tm_team" {
+    columns = [column.team_id]
   }
 }

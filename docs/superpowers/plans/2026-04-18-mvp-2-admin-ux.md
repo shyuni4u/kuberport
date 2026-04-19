@@ -12,7 +12,8 @@
 - New DB tables `teams`, `team_memberships`; new columns `templates.owning_team_id`, `template_versions.authoring_mode`, `template_versions.ui_state_json`; `template_versions.status` extended to include `deprecated`.
 - Backend API: team CRUD + membership, OpenAPI v3 proxy with cache + refresh, template preview, authoring_mode-aware template create, deprecate/undeprecate, release reject on deprecated.
 - Frontend: `/admin/teams` pages, schema-driven UI editor (`SchemaTree`, `FieldInspector`, `KindPicker`, `YamlPreview`), UI-mode create + edit pages, template detail enhancements (deprecate button, legacy-mode badge).
-- E2E test covering the admin-as-editor path: team creation → member add → UI-mode template create → publish → deploy as member → deprecate → new deploy rejected.
+- Go e2e test covering the admin-as-editor path: team creation → member add → UI-mode template create → publish → deploy as member → deprecate → new deploy rejected.
+- Playwright UI regression suite for team admin, UI editor, and deprecate flow (runs against the same local stack).
 
 **Out of scope (later plans):** YAML-mode editor UI (Plan 1's POST path stays as programmatic entry), diff view between versions, audit log, team invitation workflow, release team ownership, team-scoped catalog visibility, Helm chart import, Git-backed templates.
 
@@ -72,7 +73,7 @@ kuberport/
 │   └── lib/
 │       └── openapi.ts                    (new — parse k8s OpenAPI v3 into a field tree)
 └── docs/
-    └── (README updated in Task 22)
+    └── (README updated in Task 23)
 ```
 
 **Responsibilities (hard boundaries):**
@@ -3516,12 +3517,245 @@ git commit -m "test(e2e): plan 2 team-editor flow — create team, UI template, 
 
 ---
 
-### Task 22: Update README + docs
+### Task 22: Playwright UI regression tests
+
+Plan 2's main risk surface is the UI editor — schema-tree interactions, inspector state, live preview, and the team admin pages. Go e2e (Task 21) only covers API-level flow. This task adds a Playwright suite that drives the browser end-to-end, so regressions in later plans fail CI instead of showing up at review time.
 
 **Files:**
-- Modify: `README.md`
-- Modify: `README.ko.md`
-- Modify: `docs/local-e2e.md` (mention the UI mode flow)
+- Create: `frontend/playwright.config.ts`
+- Create: `frontend/tests/e2e/fixtures.ts` (shared login helper)
+- Create: `frontend/tests/e2e/team-admin.spec.ts`
+- Create: `frontend/tests/e2e/ui-editor.spec.ts`
+- Create: `frontend/tests/e2e/deprecate-flow.spec.ts`
+- Modify: `frontend/package.json` (scripts + devDependency)
+- Modify: `.gitignore` (playwright artifacts)
+- Modify: `Makefile` (`make e2e-ui` target)
+
+- [ ] **Step 1: Install Playwright**
+
+```bash
+cd frontend
+pnpm add -D @playwright/test
+pnpm exec playwright install chromium --with-deps
+```
+
+- [ ] **Step 2: Config**
+
+Path: `frontend/playwright.config.ts`
+```ts
+import { defineConfig } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./tests/e2e",
+  timeout: 30_000,
+  expect: { timeout: 5_000 },
+  use: {
+    baseURL: process.env.KBP_BASE_URL ?? "http://localhost:3000",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+  },
+  // Tests assume the full local-e2e.md stack is already running (compose + kind
+  // + backend + frontend dev). Playwright doesn't boot them.
+  workers: 1, // sequential — tests share app state (teams, templates)
+});
+```
+
+Append to `frontend/.gitignore`:
+```
+tests/e2e/.auth/
+test-results/
+playwright-report/
+```
+
+Add npm scripts to `frontend/package.json`:
+```json
+{
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
+  }
+}
+```
+
+Add root `Makefile` target:
+```makefile
+e2e-ui:
+	cd frontend && pnpm test:e2e
+.PHONY: e2e-ui
+```
+
+- [ ] **Step 3: Login fixture**
+
+Path: `frontend/tests/e2e/fixtures.ts`
+```ts
+import { test as base, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+
+/**
+ * OIDC flow is real (dex → Next.js callback → DB session). We perform a
+ * one-time login per user and reuse the storage state across tests.
+ */
+async function loginAs(
+  email: string,
+  password: string,
+  stateFile: string,
+): Promise<void> {
+  if (existsSync(stateFile)) return;
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
+  const page = await ctx.newPage();
+  await page.goto("/api/auth/login");
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/password/i).fill(password);
+  await page.getByRole("button", { name: /log in|login/i }).click();
+  await page.waitForURL(/\/catalog|\//);
+  mkdirSync(".auth", { recursive: true });
+  await ctx.storageState({ path: stateFile });
+  await browser.close();
+}
+
+export const test = base.extend<{ adminPage: typeof base.extend }>({
+  // Two roles pre-baked: adminPage and alicePage.
+});
+
+export { expect };
+
+export async function adminStorage(): Promise<string> {
+  const p = "tests/e2e/.auth/admin.json";
+  await loginAs("admin@example.com", "admin", p);
+  return p;
+}
+
+export async function aliceStorage(): Promise<string> {
+  const p = "tests/e2e/.auth/alice.json";
+  await loginAs("alice@example.com", "alice", p);
+  return p;
+}
+```
+
+- [ ] **Step 4: Team admin spec**
+
+Path: `frontend/tests/e2e/team-admin.spec.ts`
+```ts
+import { test, expect, adminStorage } from "./fixtures";
+
+test.describe("team admin", () => {
+  test.use({ storageState: async ({}, use) => use(await adminStorage()) });
+
+  test("create team and add alice as editor", async ({ page }) => {
+    const name = `e2e-team-${Date.now()}`;
+    await page.goto("/admin/teams");
+    await page.getByPlaceholder(/slug/).fill(name);
+    await page.getByRole("button", { name: "새 팀" }).click();
+    await expect(page.getByText(name)).toBeVisible();
+
+    await page.getByRole("link", { name: name }).click();
+    await page.getByPlaceholder(/이메일/).fill("alice@example.com");
+    await page.getByRole("combobox").selectOption("editor");
+    await page.getByRole("button", { name: "추가" }).click();
+
+    await expect(page.getByText("alice@example.com")).toBeVisible();
+    await expect(page.getByText("editor")).toBeVisible();
+  });
+});
+```
+
+- [ ] **Step 5: UI editor spec**
+
+Path: `frontend/tests/e2e/ui-editor.spec.ts`
+```ts
+import { test, expect, adminStorage } from "./fixtures";
+
+test.describe("UI mode editor", () => {
+  test.use({ storageState: async ({}, use) => use(await adminStorage()) });
+
+  test("create a Deployment template end-to-end", async ({ page }) => {
+    await page.goto("/templates/new");
+
+    // Pick Deployment from KindPicker
+    await page.getByRole("button", { name: "Deployment" }).click();
+
+    // Wait for schema tree
+    await expect(page.locator("text=spec")).toBeVisible({ timeout: 10_000 });
+
+    // Click spec.replicas and mark exposed
+    await page.locator("text=replicas").click();
+    await page.getByRole("button", { name: "사용자 노출" }).click();
+
+    // Wait for live preview to include "replicas"
+    await expect(page.locator(".monaco-editor").first()).toContainText("replicas", { timeout: 10_000 });
+
+    // Fill template metadata and save
+    const name = `e2e-ui-${Date.now()}`;
+    await page.getByPlaceholder(/템플릿 이름/).fill(name);
+    await page.getByPlaceholder(/표시 이름/).fill("E2E UI Template");
+    await page.getByRole("button", { name: /저장/ }).click();
+
+    // After save the page navigates to /templates
+    await page.waitForURL(/\/templates$/);
+    await expect(page.getByText(name)).toBeVisible();
+  });
+});
+```
+
+- [ ] **Step 6: Deprecate flow spec**
+
+Path: `frontend/tests/e2e/deprecate-flow.spec.ts`
+```ts
+import { test, expect, adminStorage } from "./fixtures";
+
+test.describe("deprecate flow", () => {
+  test.use({ storageState: async ({}, use) => use(await adminStorage()) });
+
+  test("published → deprecated → hidden from catalog → undeprecate", async ({ page }) => {
+    // Assumes at least one published template from the ui-editor spec above.
+    await page.goto("/templates");
+    const firstTemplateLink = page.locator("a[href^='/templates/']").first();
+    await firstTemplateLink.click();
+
+    // Publish v1 if still draft (idempotent-ish)
+    const publishBtn = page.getByRole("button", { name: /Publish/i });
+    if (await publishBtn.count() > 0) await publishBtn.click();
+
+    // Deprecate
+    await page.getByRole("button", { name: /Deprecate/i }).click();
+    await expect(page.getByText(/deprecated/)).toBeVisible();
+
+    // Catalog no longer shows it
+    const templateName = page.url().split("/templates/")[1];
+    await page.goto("/catalog");
+    await expect(page.getByText(templateName)).toHaveCount(0);
+
+    // Undeprecate restores it
+    await page.goto(`/templates/${templateName}`);
+    await page.getByRole("button", { name: /Undeprecate/i }).click();
+    await expect(page.getByText(/published/)).toBeVisible();
+    await page.goto("/catalog");
+    await expect(page.getByText(templateName).first()).toBeVisible();
+  });
+});
+```
+
+- [ ] **Step 7: Run against the live stack**
+
+With everything from `docs/local-e2e.md` running (compose + kind + backend + frontend dev):
+```bash
+cd frontend && pnpm test:e2e
+```
+Expected: 3 spec files, all pass. On failure, `playwright-report/` has HTML + trace.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add frontend/playwright.config.ts frontend/tests/e2e/ frontend/package.json frontend/pnpm-lock.yaml frontend/.gitignore Makefile
+git commit -m "test(frontend): playwright suite for team admin, UI editor, deprecate flow"
+```
+
+---
+
+### Task 23: Update README + docs
 
 - [ ] **Step 1: README status line**
 

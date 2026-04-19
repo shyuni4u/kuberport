@@ -43,6 +43,20 @@ type Session struct {
 	ExpiresAt             pgtype.Timestamptz `json:"expires_at"`
 }
 
+type Team struct {
+	ID          pgtype.UUID        `json:"id"`
+	Name        string             `json:"name"`
+	DisplayName pgtype.Text        `json:"display_name"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type TeamMembership struct {
+	UserID    pgtype.UUID        `json:"user_id"`
+	TeamID    pgtype.UUID        `json:"team_id"`
+	Role      string             `json:"role"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Template struct {
 	ID               pgtype.UUID        `json:"id"`
 	Name             string             `json:"name"`
@@ -53,6 +67,7 @@ type Template struct {
 	CurrentVersionID pgtype.UUID        `json:"current_version_id"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	OwningTeamID     pgtype.UUID        `json:"owning_team_id"`
 }
 
 type TemplateVersion struct {
@@ -67,6 +82,8 @@ type TemplateVersion struct {
 	CreatedByUserID pgtype.UUID        `json:"created_by_user_id"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	PublishedAt     pgtype.Timestamptz `json:"published_at"`
+	AuthoringMode   string             `json:"authoring_mode"`
+	UiStateJson     []byte             `json:"ui_state_json"`
 }
 
 type User struct {

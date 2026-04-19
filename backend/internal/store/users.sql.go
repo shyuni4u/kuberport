@@ -11,12 +11,48 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, oidc_subject, email, display_name, first_seen_at, last_seen_at FROM users WHERE email = $1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email pgtype.Text) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.OidcSubject,
+		&i.Email,
+		&i.DisplayName,
+		&i.FirstSeenAt,
+		&i.LastSeenAt,
+	)
+	return i, err
+}
+
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, oidc_subject, email, display_name, first_seen_at, last_seen_at FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.OidcSubject,
+		&i.Email,
+		&i.DisplayName,
+		&i.FirstSeenAt,
+		&i.LastSeenAt,
+	)
+	return i, err
+}
+
+const getUserByOidcSubject = `-- name: GetUserByOidcSubject :one
+SELECT id, oidc_subject, email, display_name, first_seen_at, last_seen_at FROM users WHERE oidc_subject = $1
+`
+
+func (q *Queries) GetUserByOidcSubject(ctx context.Context, oidcSubject string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByOidcSubject, oidcSubject)
 	var i User
 	err := row.Scan(
 		&i.ID,

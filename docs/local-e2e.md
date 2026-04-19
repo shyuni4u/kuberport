@@ -235,6 +235,15 @@ curl -s -H "Authorization: Bearer $ADM" -X POST \
 3. Catalog → Web Service → 배포 → fill form → submit
 4. Release detail page should show `healthy` with 1 instance
 
+## Troubleshooting
+
+- **`cluster has no ca_bundle` on OpenAPI fetch.** As of the third-round
+  hardening pass, empty `ca_bundle` cluster registrations are rejected at
+  openapi proxy time to avoid silently trusting any cert. Either (a) register
+  the cluster WITH its CA (step 9 above already does — `KIND_CA`), or (b) for
+  bare-bones manual tests, export `KBP_DEV_ALLOW_INSECURE_CLUSTERS=true` on the
+  backend process. Never set this env in prod.
+
 ## Known limits
 
 - **dex staticPasswords ignores the `groups` field.** Even with `groups: [kuberport-admin]` in `dex.yaml`, the issued id_token has no `groups` claim. We work around this two ways:

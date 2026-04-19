@@ -6,4 +6,5 @@ type Config struct {
 	OIDCIssuer          string
 	OIDCAudience        string
 	AppEncryptionKeyB64 string
+	OpenAPICacheMax     int
 }

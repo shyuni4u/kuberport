@@ -30,7 +30,7 @@ func (e emailVerifier) Verify(_ context.Context, _ string) (auth.Claims, error) 
 }
 
 func TestAuthMiddleware_Rejects_NoHeader(t *testing.T) {
-	r := api.NewRouter(config.Config{}, api.Deps{Verifier: stubVerifier{}})
+	r := api.NewRouter(config.Config{}, api.Deps{Verifier: stubVerifier{}, Store: testStore(t)})
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/me", nil)
 	r.ServeHTTP(w, req)
@@ -39,7 +39,7 @@ func TestAuthMiddleware_Rejects_NoHeader(t *testing.T) {
 }
 
 func TestAuthMiddleware_Accepts_Bearer(t *testing.T) {
-	r := api.NewRouter(config.Config{}, api.Deps{Verifier: stubVerifier{}})
+	r := api.NewRouter(config.Config{}, api.Deps{Verifier: stubVerifier{}, Store: testStore(t)})
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/me", nil)
 	req.Header.Set("Authorization", "Bearer anything")
@@ -67,7 +67,7 @@ func TestAuthMiddleware_DevAdminEmails(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("KBP_DEV_ADMIN_EMAILS", tc.envVal)
 			v := emailVerifier{claims: auth.Claims{Email: tc.claimEmail}}
-			r := api.NewRouter(config.Config{}, api.Deps{Verifier: v})
+			r := api.NewRouter(config.Config{}, api.Deps{Verifier: v, Store: testStore(t)})
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/v1/me", nil)
 			req.Header.Set("Authorization", "Bearer x")

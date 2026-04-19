@@ -12,7 +12,7 @@ import (
 )
 
 const getTemplateByName = `-- name: GetTemplateByName :one
-SELECT id, name, display_name, description, tags, owner_user_id, current_version_id, created_at, updated_at FROM templates WHERE name = $1
+SELECT id, name, display_name, description, tags, owner_user_id, current_version_id, created_at, updated_at, owning_team_id FROM templates WHERE name = $1
 `
 
 func (q *Queries) GetTemplateByName(ctx context.Context, name string) (Template, error) {
@@ -28,12 +28,13 @@ func (q *Queries) GetTemplateByName(ctx context.Context, name string) (Template,
 		&i.CurrentVersionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwningTeamID,
 	)
 	return i, err
 }
 
 const getTemplateVersion = `-- name: GetTemplateVersion :one
-SELECT tv.id, tv.template_id, tv.version, tv.resources_yaml, tv.ui_spec_yaml, tv.metadata_yaml, tv.status, tv.notes, tv.created_by_user_id, tv.created_at, tv.published_at FROM template_versions tv
+SELECT tv.id, tv.template_id, tv.version, tv.resources_yaml, tv.ui_spec_yaml, tv.metadata_yaml, tv.status, tv.notes, tv.created_by_user_id, tv.created_at, tv.published_at, tv.authoring_mode, tv.ui_state_json FROM template_versions tv
   JOIN templates t ON t.id = tv.template_id
  WHERE t.name = $1 AND tv.version = $2
 `
@@ -58,13 +59,15 @@ func (q *Queries) GetTemplateVersion(ctx context.Context, arg GetTemplateVersion
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.PublishedAt,
+		&i.AuthoringMode,
+		&i.UiStateJson,
 	)
 	return i, err
 }
 
 const insertTemplate = `-- name: InsertTemplate :one
 INSERT INTO templates (name, display_name, description, tags, owner_user_id)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, name, display_name, description, tags, owner_user_id, current_version_id, created_at, updated_at
+VALUES ($1, $2, $3, $4, $5) RETURNING id, name, display_name, description, tags, owner_user_id, current_version_id, created_at, updated_at, owning_team_id
 `
 
 type InsertTemplateParams struct {
@@ -94,6 +97,46 @@ func (q *Queries) InsertTemplate(ctx context.Context, arg InsertTemplateParams) 
 		&i.CurrentVersionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OwningTeamID,
+	)
+	return i, err
+}
+
+const insertTemplateV2 = `-- name: InsertTemplateV2 :one
+INSERT INTO templates (name, display_name, description, tags, owner_user_id, owning_team_id)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, display_name, description, tags, owner_user_id, current_version_id, created_at, updated_at, owning_team_id
+`
+
+type InsertTemplateV2Params struct {
+	Name         string      `json:"name"`
+	DisplayName  string      `json:"display_name"`
+	Description  pgtype.Text `json:"description"`
+	Tags         []string    `json:"tags"`
+	OwnerUserID  pgtype.UUID `json:"owner_user_id"`
+	OwningTeamID pgtype.UUID `json:"owning_team_id"`
+}
+
+func (q *Queries) InsertTemplateV2(ctx context.Context, arg InsertTemplateV2Params) (Template, error) {
+	row := q.db.QueryRow(ctx, insertTemplateV2,
+		arg.Name,
+		arg.DisplayName,
+		arg.Description,
+		arg.Tags,
+		arg.OwnerUserID,
+		arg.OwningTeamID,
+	)
+	var i Template
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.DisplayName,
+		&i.Description,
+		&i.Tags,
+		&i.OwnerUserID,
+		&i.CurrentVersionID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OwningTeamID,
 	)
 	return i, err
 }
@@ -101,7 +144,7 @@ func (q *Queries) InsertTemplate(ctx context.Context, arg InsertTemplateParams) 
 const insertTemplateVersion = `-- name: InsertTemplateVersion :one
 INSERT INTO template_versions (
   template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml, status, notes, created_by_user_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml, status, notes, created_by_user_id, created_at, published_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml, status, notes, created_by_user_id, created_at, published_at, authoring_mode, ui_state_json
 `
 
 type InsertTemplateVersionParams struct {
@@ -139,12 +182,66 @@ func (q *Queries) InsertTemplateVersion(ctx context.Context, arg InsertTemplateV
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.PublishedAt,
+		&i.AuthoringMode,
+		&i.UiStateJson,
+	)
+	return i, err
+}
+
+const insertTemplateVersionV2 = `-- name: InsertTemplateVersionV2 :one
+INSERT INTO template_versions (
+  template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml,
+  status, notes, created_by_user_id, authoring_mode, ui_state_json
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml, status, notes, created_by_user_id, created_at, published_at, authoring_mode, ui_state_json
+`
+
+type InsertTemplateVersionV2Params struct {
+	TemplateID      pgtype.UUID `json:"template_id"`
+	Version         int32       `json:"version"`
+	ResourcesYaml   string      `json:"resources_yaml"`
+	UiSpecYaml      string      `json:"ui_spec_yaml"`
+	MetadataYaml    pgtype.Text `json:"metadata_yaml"`
+	Status          string      `json:"status"`
+	Notes           pgtype.Text `json:"notes"`
+	CreatedByUserID pgtype.UUID `json:"created_by_user_id"`
+	AuthoringMode   string      `json:"authoring_mode"`
+	UiStateJson     []byte      `json:"ui_state_json"`
+}
+
+func (q *Queries) InsertTemplateVersionV2(ctx context.Context, arg InsertTemplateVersionV2Params) (TemplateVersion, error) {
+	row := q.db.QueryRow(ctx, insertTemplateVersionV2,
+		arg.TemplateID,
+		arg.Version,
+		arg.ResourcesYaml,
+		arg.UiSpecYaml,
+		arg.MetadataYaml,
+		arg.Status,
+		arg.Notes,
+		arg.CreatedByUserID,
+		arg.AuthoringMode,
+		arg.UiStateJson,
+	)
+	var i TemplateVersion
+	err := row.Scan(
+		&i.ID,
+		&i.TemplateID,
+		&i.Version,
+		&i.ResourcesYaml,
+		&i.UiSpecYaml,
+		&i.MetadataYaml,
+		&i.Status,
+		&i.Notes,
+		&i.CreatedByUserID,
+		&i.CreatedAt,
+		&i.PublishedAt,
+		&i.AuthoringMode,
+		&i.UiStateJson,
 	)
 	return i, err
 }
 
 const listTemplateVersions = `-- name: ListTemplateVersions :many
-SELECT tv.id, tv.template_id, tv.version, tv.resources_yaml, tv.ui_spec_yaml, tv.metadata_yaml, tv.status, tv.notes, tv.created_by_user_id, tv.created_at, tv.published_at FROM template_versions tv
+SELECT tv.id, tv.template_id, tv.version, tv.resources_yaml, tv.ui_spec_yaml, tv.metadata_yaml, tv.status, tv.notes, tv.created_by_user_id, tv.created_at, tv.published_at, tv.authoring_mode, tv.ui_state_json FROM template_versions tv
   JOIN templates t ON t.id = tv.template_id
  WHERE t.name = $1
  ORDER BY tv.version DESC
@@ -171,6 +268,8 @@ func (q *Queries) ListTemplateVersions(ctx context.Context, name string) ([]Temp
 			&i.CreatedByUserID,
 			&i.CreatedAt,
 			&i.PublishedAt,
+			&i.AuthoringMode,
+			&i.UiStateJson,
 		); err != nil {
 			return nil, err
 		}
@@ -183,9 +282,10 @@ func (q *Queries) ListTemplateVersions(ctx context.Context, name string) ([]Temp
 }
 
 const listTemplates = `-- name: ListTemplates :many
-SELECT t.id, t.name, t.display_name, t.description, t.tags, t.owner_user_id, t.current_version_id, t.created_at, t.updated_at,
+SELECT t.id, t.name, t.display_name, t.description, t.tags, t.owner_user_id, t.current_version_id, t.created_at, t.updated_at, t.owning_team_id,
        tv.version    AS current_version,
-       tv.ui_spec_yaml AS current_ui_spec
+       tv.ui_spec_yaml AS current_ui_spec,
+       tv.status     AS current_status
   FROM templates t
   LEFT JOIN template_versions tv ON tv.id = t.current_version_id
  ORDER BY t.name
@@ -201,8 +301,10 @@ type ListTemplatesRow struct {
 	CurrentVersionID pgtype.UUID        `json:"current_version_id"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	OwningTeamID     pgtype.UUID        `json:"owning_team_id"`
 	CurrentVersion   pgtype.Int4        `json:"current_version"`
 	CurrentUiSpec    pgtype.Text        `json:"current_ui_spec"`
+	CurrentStatus    pgtype.Text        `json:"current_status"`
 }
 
 func (q *Queries) ListTemplates(ctx context.Context) ([]ListTemplatesRow, error) {
@@ -224,8 +326,10 @@ func (q *Queries) ListTemplates(ctx context.Context) ([]ListTemplatesRow, error)
 			&i.CurrentVersionID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.OwningTeamID,
 			&i.CurrentVersion,
 			&i.CurrentUiSpec,
+			&i.CurrentStatus,
 		); err != nil {
 			return nil, err
 		}
@@ -252,7 +356,7 @@ const publishTemplateVersion = `-- name: PublishTemplateVersion :one
 UPDATE template_versions
    SET status = 'published', published_at = now()
  WHERE id = $1 AND status = 'draft'
- RETURNING id, template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml, status, notes, created_by_user_id, created_at, published_at
+ RETURNING id, template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml, status, notes, created_by_user_id, created_at, published_at, authoring_mode, ui_state_json
 `
 
 func (q *Queries) PublishTemplateVersion(ctx context.Context, id pgtype.UUID) (TemplateVersion, error) {
@@ -270,6 +374,41 @@ func (q *Queries) PublishTemplateVersion(ctx context.Context, id pgtype.UUID) (T
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.PublishedAt,
+		&i.AuthoringMode,
+		&i.UiStateJson,
+	)
+	return i, err
+}
+
+const setTemplateVersionStatus = `-- name: SetTemplateVersionStatus :one
+UPDATE template_versions
+   SET status = $2, published_at = CASE WHEN $2 = 'published' AND published_at IS NULL THEN now() ELSE published_at END
+ WHERE id = $1
+ RETURNING id, template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml, status, notes, created_by_user_id, created_at, published_at, authoring_mode, ui_state_json
+`
+
+type SetTemplateVersionStatusParams struct {
+	ID     pgtype.UUID `json:"id"`
+	Status string      `json:"status"`
+}
+
+func (q *Queries) SetTemplateVersionStatus(ctx context.Context, arg SetTemplateVersionStatusParams) (TemplateVersion, error) {
+	row := q.db.QueryRow(ctx, setTemplateVersionStatus, arg.ID, arg.Status)
+	var i TemplateVersion
+	err := row.Scan(
+		&i.ID,
+		&i.TemplateID,
+		&i.Version,
+		&i.ResourcesYaml,
+		&i.UiSpecYaml,
+		&i.MetadataYaml,
+		&i.Status,
+		&i.Notes,
+		&i.CreatedByUserID,
+		&i.CreatedAt,
+		&i.PublishedAt,
+		&i.AuthoringMode,
+		&i.UiStateJson,
 	)
 	return i, err
 }

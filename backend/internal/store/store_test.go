@@ -100,3 +100,37 @@ func TestInsertClusterAndTemplate(t *testing.T) {
 	require.NoError(t, err)
 	require.NotZero(t, tpl.ID)
 }
+
+func TestInsertTeamAndMembership(t *testing.T) {
+	ctx := context.Background()
+	s, err := store.NewStore(ctx, testDSN(t))
+	require.NoError(t, err)
+	defer s.Close()
+
+	u, err := s.UpsertUser(ctx, store.UpsertUserParams{
+		OidcSubject: "team-owner-" + time.Now().Format("150405.000000"),
+		Email:       pgText("owner@example.com"),
+		DisplayName: pgText("Owner"),
+	})
+	require.NoError(t, err)
+
+	team, err := s.InsertTeam(ctx, store.InsertTeamParams{
+		Name:        "team-" + time.Now().Format("150405.000000"),
+		DisplayName: pgText("Team X"),
+	})
+	require.NoError(t, err)
+	require.NotZero(t, team.ID)
+
+	mem, err := s.InsertTeamMembership(ctx, store.InsertTeamMembershipParams{
+		UserID: u.ID,
+		TeamID: team.ID,
+		Role:   "editor",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "editor", mem.Role)
+
+	members, err := s.ListTeamMembers(ctx, team.ID)
+	require.NoError(t, err)
+	require.Len(t, members, 1)
+	require.Equal(t, "owner@example.com", members[0].Email.String)
+}

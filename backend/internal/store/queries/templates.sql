@@ -1,7 +1,8 @@
 -- name: ListTemplates :many
-SELECT t.*,
+SELECT t.id, t.name, t.display_name, t.description, t.tags, t.owner_user_id, t.current_version_id, t.created_at, t.updated_at, t.owning_team_id,
        tv.version    AS current_version,
-       tv.ui_spec_yaml AS current_ui_spec
+       tv.ui_spec_yaml AS current_ui_spec,
+       tv.status     AS current_status
   FROM templates t
   LEFT JOIN template_versions tv ON tv.id = t.current_version_id
  ORDER BY t.name;
@@ -40,3 +41,19 @@ SELECT tv.* FROM template_versions tv
   JOIN templates t ON t.id = tv.template_id
  WHERE t.name = $1
  ORDER BY tv.version DESC;
+
+-- name: InsertTemplateV2 :one
+INSERT INTO templates (name, display_name, description, tags, owner_user_id, owning_team_id)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;
+
+-- name: InsertTemplateVersionV2 :one
+INSERT INTO template_versions (
+  template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml,
+  status, notes, created_by_user_id, authoring_mode, ui_state_json
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
+
+-- name: SetTemplateVersionStatus :one
+UPDATE template_versions
+   SET status = $2, published_at = CASE WHEN $2 = 'published' AND published_at IS NULL THEN now() ELSE published_at END
+ WHERE id = $1
+ RETURNING *;
