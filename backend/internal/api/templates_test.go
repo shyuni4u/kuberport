@@ -160,3 +160,58 @@ func TestTemplates_Deprecate_OnlyFromPublished(t *testing.T) {
 	w := do(t, r, http.MethodPost, "/v1/templates/"+name+"/versions/1/deprecate", nil)
 	require.Equal(t, http.StatusConflict, w.Code)
 }
+
+func TestTemplates_NewVersion_UIMode(t *testing.T) {
+	r := newTestRouterAdmin(t)
+
+	// Seed v1 UI-mode template
+	body := map[string]any{
+		"name": "nv-" + randSuffix(), "display_name": "NV",
+		"authoring_mode": "ui",
+		"ui_state": map[string]any{
+			"resources": []any{
+				map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "name": "c", "fields": map[string]any{
+					"data.k": map[string]any{"mode": "fixed", "fixedValue": "v1"},
+				}},
+			},
+		},
+	}
+	raw, _ := json.Marshal(body)
+	w := do(t, r, http.MethodPost, "/v1/templates", bytes.NewReader(raw))
+	require.Equal(t, http.StatusCreated, w.Code)
+	var created struct {
+		Template struct{ Name string } `json:"template"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &created)
+	name := created.Template.Name
+
+	// publish v1 so we can create v2
+	w = do(t, r, http.MethodPost, "/v1/templates/"+name+"/versions/1/publish", nil)
+	require.Equal(t, http.StatusOK, w.Code, "publish v1: %s", w.Body.String())
+
+	// Create v2 draft with new UI state
+	nvBody := map[string]any{
+		"authoring_mode": "ui",
+		"ui_state": map[string]any{
+			"resources": []any{
+				map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "name": "c", "fields": map[string]any{
+					"data.k": map[string]any{"mode": "fixed", "fixedValue": "v2"},
+				}},
+			},
+		},
+	}
+	nvRaw, _ := json.Marshal(nvBody)
+	w = do(t, r, http.MethodPost, "/v1/templates/"+name+"/versions", bytes.NewReader(nvRaw))
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), `"version":2`)
+	require.Contains(t, w.Body.String(), `"status":"draft"`)
+}
+
+func TestTemplates_NewVersion_RejectsWhenDraftExists(t *testing.T) {
+	r := newTestRouterAdmin(t)
+	name := seedGlobalTemplate(t, r) // leaves a draft v1
+
+	nvBody := `{"authoring_mode":"yaml","resources_yaml":"apiVersion: v1\nkind: ConfigMap\nmetadata: {name: c}\ndata: {k: v}\n","ui_spec_yaml":"fields: []\n"}`
+	w := do(t, r, http.MethodPost, "/v1/templates/"+name+"/versions", bytes.NewReader([]byte(nvBody)))
+	require.Equal(t, http.StatusConflict, w.Code)
+}

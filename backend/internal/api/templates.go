@@ -246,6 +246,126 @@ func (h *Handlers) PublishVersion(c *gin.Context) {
 	c.JSON(http.StatusOK, published)
 }
 
+type createVersionReq struct {
+	AuthoringMode string                   `json:"authoring_mode" binding:"required,oneof=yaml ui"`
+	ResourcesYAML string                   `json:"resources_yaml"`
+	UISpecYAML    string                   `json:"ui_spec_yaml"`
+	UIState       *template.UIModeTemplate `json:"ui_state"`
+	MetadataYAML  string                   `json:"metadata_yaml"`
+	Notes         string                   `json:"notes"`
+}
+
+func (h *Handlers) CreateTemplateVersion(c *gin.Context) {
+	tpl, ok := h.ensureTemplateEditor(c, c.Param("name"))
+	if !ok {
+		return
+	}
+
+	var r createVersionReq
+	if err := c.ShouldBindJSON(&r); err != nil {
+		writeError(c, http.StatusBadRequest, "validation-error", err.Error())
+		return
+	}
+
+	// mode/payload consistency — same rules as POST /v1/templates
+	switch r.AuthoringMode {
+	case "ui":
+		if r.UIState == nil {
+			writeError(c, http.StatusBadRequest, "validation-error", "authoring_mode=ui requires ui_state")
+			return
+		}
+		if r.ResourcesYAML != "" || r.UISpecYAML != "" {
+			writeError(c, http.StatusBadRequest, "validation-error", "authoring_mode=ui must not send resources_yaml/ui_spec_yaml")
+			return
+		}
+		res, spec, err := template.SerializeUIMode(*r.UIState)
+		if err != nil {
+			writeError(c, http.StatusBadRequest, "validation-error", err.Error())
+			return
+		}
+		r.ResourcesYAML, r.UISpecYAML = res, spec
+	case "yaml":
+		if r.UIState != nil {
+			writeError(c, http.StatusBadRequest, "validation-error", "authoring_mode=yaml must not send ui_state")
+			return
+		}
+		if r.ResourcesYAML == "" || r.UISpecYAML == "" {
+			writeError(c, http.StatusBadRequest, "validation-error", "authoring_mode=yaml requires resources_yaml + ui_spec_yaml")
+			return
+		}
+	}
+
+	// spec dry-run — same as CreateTemplate
+	if err := template.ValidateSpec(r.ResourcesYAML, r.UISpecYAML); err != nil {
+		writeError(c, http.StatusBadRequest, "validation-error", err.Error())
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// enforce: at most one draft per template
+	existing, err := h.deps.Store.ListTemplateVersions(ctx, tpl.Name)
+	if err != nil {
+		log.Printf("CreateTemplateVersion list: %v", err)
+		writeError(c, http.StatusInternalServerError, "internal", "failed to list versions")
+		return
+	}
+	for _, v := range existing {
+		if v.Status == "draft" {
+			writeError(c, http.StatusConflict, "conflict",
+				"a draft already exists for this template; publish or delete it before creating a new version")
+			return
+		}
+	}
+
+	u, okAuth := auth.UserFrom(ctx)
+	if !okAuth {
+		writeError(c, http.StatusUnauthorized, "unauthenticated", "user not in context")
+		return
+	}
+
+	var uiStateJSON []byte
+	if r.UIState != nil {
+		b, _ := json.Marshal(r.UIState)
+		uiStateJSON = b
+	}
+
+	var ver store.TemplateVersion
+	err = h.deps.Store.WithTx(ctx, func(q *store.Queries) error {
+		user, err := q.UpsertUser(ctx, store.UpsertUserParams{
+			OidcSubject: u.Subject,
+			Email:       store.PgText(u.Email),
+			DisplayName: store.PgText(u.Name),
+		})
+		if err != nil {
+			return err
+		}
+		nextVer, err := q.NextTemplateVersion(ctx, tpl.ID)
+		if err != nil {
+			return err
+		}
+		ver, err = q.InsertTemplateVersionV2(ctx, store.InsertTemplateVersionV2Params{
+			TemplateID:      tpl.ID,
+			Version:         nextVer,
+			ResourcesYaml:   r.ResourcesYAML,
+			UiSpecYaml:      r.UISpecYAML,
+			MetadataYaml:    store.PgText(r.MetadataYAML),
+			Status:          "draft",
+			Notes:           store.PgText(r.Notes),
+			CreatedByUserID: user.ID,
+			AuthoringMode:   r.AuthoringMode,
+			UiStateJson:     uiStateJSON,
+		})
+		return err
+	})
+	if err != nil {
+		log.Printf("CreateTemplateVersion: %v", err)
+		writeError(c, http.StatusInternalServerError, "internal", "failed to create version")
+		return
+	}
+	c.JSON(http.StatusCreated, ver)
+}
+
 func (h *Handlers) DeprecateVersion(c *gin.Context) {
 	_, ok := h.ensureTemplateEditor(c, c.Param("name"))
 	if !ok {
