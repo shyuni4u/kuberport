@@ -124,7 +124,9 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	up.Path = upstreamPath
+	// JoinPath preserves any base prefix in the cluster URL (e.g. a reverse
+	// proxy routing /k8s-cluster-1/… to the apiserver) instead of stomping it.
+	up = up.JoinPath(upstreamPath)
 	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, up.String(), nil)
 	if err != nil {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())

@@ -175,17 +175,23 @@ func setJSONPathAbsolute(obj map[string]any, path string, v any) error {
 			if s.idx > maxArrayIndex {
 				return fmt.Errorf("array index %d exceeds limit %d", s.idx, maxArrayIndex)
 			}
-			for len(arr) <= s.idx {
-				if last {
-					arr = append(arr, nil)
-				} else {
+			if s.idx >= len(arr) {
+				grown := make([]any, s.idx+1)
+				copy(grown, arr)
+				// New slots get container placeholders if another segment
+				// will descend into them; trailing writes (last) leave nil
+				// because the index s.idx is assigned below.
+				if !last {
 					next := segs[i+1]
-					if next.arr {
-						arr = append(arr, []any{})
-					} else {
-						arr = append(arr, map[string]any{})
+					for j := len(arr); j <= s.idx; j++ {
+						if next.arr {
+							grown[j] = []any{}
+						} else {
+							grown[j] = map[string]any{}
+						}
 					}
 				}
+				arr = grown
 			}
 			if last {
 				arr[s.idx] = v
