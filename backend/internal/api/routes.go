@@ -51,6 +51,7 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 	v.GET("/templates", h.ListTemplates)
 	v.POST("/templates", h.CreateTemplate)
 	v.POST("/templates/preview", h.PreviewTemplate)
+	v.POST("/templates/:name/render", h.PreviewRender)
 	v.GET("/templates/:name", h.GetTemplate)
 	v.GET("/templates/:name/versions", h.ListTemplateVersions)
 	v.POST("/templates/:name/versions", h.CreateTemplateVersion)
