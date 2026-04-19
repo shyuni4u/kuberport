@@ -98,6 +98,16 @@ jobs:
           cluster_name: kuberport
           config: /tmp/kind-config.yaml
 
+      - name: Expose host.docker.internal inside kind node
+        # GitHub Actions Linux runners do not auto-inject host.docker.internal
+        # into container /etc/hosts the way Docker Desktop does. Without this,
+        # kube-apiserver cannot resolve the Dex issuer URL to fetch JWKS and
+        # rejects every OIDC token with 401 — playwright then sees an empty
+        # schema tree in test 02 (no `replicas` node) and the test times out.
+        run: |
+          GATEWAY=$(docker network inspect kind -f '{{(index .IPAM.Config 0).Gateway}}')
+          docker exec kuberport-control-plane sh -c "echo '$GATEWAY host.docker.internal' >> /etc/hosts"
+
       - name: Build backend
         run: cd backend && go build -o ../bin/kuberport-server ./cmd/server
 
