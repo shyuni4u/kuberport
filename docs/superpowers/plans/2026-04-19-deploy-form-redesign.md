@@ -548,6 +548,27 @@ export type UISpecField =
 
 export type UISpec = { fields: UISpecField[] };
 
+// ⚠️ 구현자 주의 (RHF ↔ Zod key 일치):
+// react-hook-form 은 `name="spec.replicas"` 를 중첩 경로로 해석해
+// form values 를 `{ spec: { replicas: … } }` 로 구성한다. 반면 아래
+// schemaFromUISpec 은 평면 키 `{ "spec.replicas": … }` 로 스키마를 만든다.
+// zodResolver 가 이 둘을 연결하면 중첩 vs 평면 불일치로 유효성 검사가
+// 실제로는 동작하지 않는다.
+//
+// 구현 첫 스텝에서 백엔드 `backend/internal/template/render.go` 가 values
+// 를 어떻게 lookup 하는지 확인 후, 아래 둘 중 하나로 통일할 것:
+//
+//   A. **중첩 (권장)** — `schemaFromUISpec` 도 path 를 쪼개 중첩 `z.object`
+//      를 빌드하고, RHF 의 기본 nesting 을 그대로 활용. 백엔드가 values
+//      를 JSON 트리로 traverse 한다면 자연스럽다.
+//
+//   B. **평면** — RHF 필드 이름에서 점을 이스케이프(예: `spec__replicas`)
+//      하고 submit 시점에 경로를 복구해 백엔드 전송. Zod 는 지금처럼 평면
+//      유지. 백엔드가 `values["spec.replicas"]` flat lookup 이면 택.
+//
+// 아래 구현은 **평면 샘플**이다. 중첩으로 간다면 shape 빌드 로직을
+// `setAtPath(shape, f.path, zs)` 재귀 형태로 바꾸고, defaults 도 동일 규칙.
+
 export function schemaFromUISpec(spec: UISpec) {
   const shape: Record<string, ZodTypeAny> = {};
   for (const f of spec.fields) {
@@ -766,7 +787,20 @@ function renderWidget(
         </div>
       );
     }
-    return <Input type="number" min={field.min} max={field.max} value={String(rhf.value ?? "")} onChange={(e) => rhf.onChange(Number(e.target.value))} />;
+    return (
+      <Input
+        type="number"
+        min={field.min}
+        max={field.max}
+        value={rhf.value === undefined || rhf.value === null ? "" : String(rhf.value)}
+        onChange={(e) => {
+          // 빈 문자열은 undefined 로. Number("") === 0 이라 그대로 변환하면
+          // 사용자가 지운 optional 필드에 0 이 주입된다.
+          const v = e.target.value;
+          rhf.onChange(v === "" ? undefined : Number(v));
+        }}
+      />
+    );
   }
   if (field.type === "enum") {
     if (field.values.length <= 4) {
@@ -929,6 +963,9 @@ export function RBACCheckPanel({ cluster, namespace, kinds }: Props) {
       setResults([]);
       return;
     }
+    // cluster/namespace/kinds 가 빠르게 바뀔 때 이전 요청 응답이 최신
+    // 상태를 덮어쓰지 않도록 active 플래그로 보호.
+    let active = true;
     setLoading(true);
     Promise.all(
       kinds.map(async (k) => {
@@ -944,8 +981,15 @@ export function RBACCheckPanel({ cluster, namespace, kinds }: Props) {
         return { allowed: body.allowed, resource: k, reason: body.reason ?? "" };
       }),
     )
-      .then(setResults)
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (active) setResults(r);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [cluster, namespace, kinds.join(",")]);
 
   const allAllowed = results.length > 0 && results.every((r) => r.allowed);

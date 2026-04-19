@@ -112,6 +112,9 @@ func StreamPodLogs(ctx context.Context, cs kubernetes.Interface, namespace strin
             }
             defer rc.Close()
             sc := bufio.NewScanner(rc)
+            // k8s 로그는 JSON 포맷 + 스택 트레이스 시 기본 64KB 라인 한계를
+            // 쉽게 넘긴다. 1MB 까지 허용해 bufio.ErrTooLong 을 막는다.
+            sc.Buffer(make([]byte, 64*1024), 1024*1024)
             for sc.Scan() {
                 select {
                 case <-ctx.Done():
