@@ -31,3 +31,6 @@ frontend/out/
 
 # Docker / runtime
 *.pid
+
+# Git worktrees (superpowers convention)
+.worktrees/

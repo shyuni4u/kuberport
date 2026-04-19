@@ -91,6 +91,17 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 		owning = pgtype.UUID{Bytes: parsed, Valid: true}
 	}
 
+	// Auth: global templates (no owning team) require kuberport-admin.
+	// Team templates: delegate to ensureTeamEditor (admin OR team editor).
+	if !owning.Valid {
+		if !isKuberportAdmin(u) {
+			writeError(c, http.StatusForbidden, "rbac-denied", "global template requires kuberport-admin")
+			return
+		}
+	} else if !h.ensureTeamEditor(c, owning) {
+		return
+	}
+
 	var uiStateJSON []byte
 	if r.UIState != nil {
 		b, _ := json.Marshal(r.UIState)
@@ -207,6 +218,9 @@ func (h *Handlers) GetTemplateVersion(c *gin.Context) {
 
 func (h *Handlers) PublishVersion(c *gin.Context) {
 	ctx := c.Request.Context()
+	if _, ok := h.ensureTemplateEditor(c, c.Param("name")); !ok {
+		return
+	}
 	v64, err := strconv.ParseInt(c.Param("v"), 10, 32)
 	if err != nil {
 		writeError(c, http.StatusBadRequest, "validation-error", "version must be integer")
