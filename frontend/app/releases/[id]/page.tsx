@@ -1,4 +1,4 @@
-import { StatusBadge } from "@/components/StatusBadge";
+import { StatusChip, statusChipVariantFromRelease } from "@/components/StatusChip";
 import { apiFetch } from "@/lib/api-server";
 
 interface ReleaseDetail {
@@ -48,7 +48,7 @@ export default async function ReleaseDetailPage({
     <div>
       <div className="flex items-center gap-3 mb-4">
         <h1 className="text-xl font-bold">{d.name}</h1>
-        <StatusBadge status={d.status} />
+        <StatusChip variant={statusChipVariantFromRelease(d.status)}>{d.status}</StatusChip>
         <span className="text-slate-500 text-sm">
           {d.template?.name}@v{d.template?.version}
         </span>
