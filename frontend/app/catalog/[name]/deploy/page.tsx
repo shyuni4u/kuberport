@@ -18,8 +18,10 @@ export default function DeployPage() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    setCluster(localStorage.getItem("kbp_cluster") ?? "");
     (async () => {
+      // Read cached cluster after yielding to avoid a cascading-render warning
+      // from lint: setState inside an effect body must not be synchronous.
+      setCluster(localStorage.getItem("kbp_cluster") ?? "");
       try {
         const tRes = await fetch(`/api/v1/templates/${name}`);
         if (!tRes.ok) throw new Error(`템플릿 조회 실패: ${tRes.status}`);
