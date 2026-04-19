@@ -5,7 +5,7 @@
 > Template-driven self-service portal for Kubernetes.
 > Admins publish YAML + ui-spec templates; non-experts deploy and operate via abstracted forms.
 
-**Status:** Plan 1 (vertical slice) shipped. You can log in, register a cluster, publish a YAML-mode template, and deploy it. Plan 2 (Admin UX) is in the design phase; Plan 3 (User observability) is not written yet.
+**Status:** Plans 1 and 2 shipped. Admins can build templates in a UI editor, own them via teams, deprecate versions; users deploy, see status, and never see deprecated templates in the catalog. Plan 3 (User observability) is not written yet.
 
 ---
 
@@ -118,7 +118,7 @@ Work is split into three plans that each ship usable software:
 | # | Plan | Ships | Link |
 |---|------|-------|------|
 | 1 | **Vertical slice** | OIDC login, YAML-mode template CRUD, deploy form, release list & overview | [plan](docs/superpowers/plans/2026-04-16-mvp-1-vertical-slice.md) ✅ |
-| 2 | **Admin UX** | UI-mode editor (tree + meta + live preview), publish/deprecate, version history | *(brainstorming → spec → plan)* |
+| 2 | **Admin UX** | UI-mode editor (tree + meta + live preview), publish/deprecate, version history, teams | [plan](docs/superpowers/plans/2026-04-18-mvp-2-admin-ux.md) ✅ |
 | 3 | **User observability** | Release logs (SSE), events, settings tabs, update-available migration, Helm chart for self-hosting | *(not written yet)* |
 
 Deferred beyond the MVP: CRD support, Git-backed templates, team/RBAC UI, Helm chart import, release history.
@@ -149,7 +149,7 @@ kuberport/
 
 ## Contributing
 
-Not yet open to outside contributions — the shape of the system is still stabilizing. Issues and PRs will be welcome once Plan 2 is scoped and merged.
+Not yet open to outside contributions — the shape of the system is still stabilizing. Issues and PRs will be welcome once Plan 3 is scoped and merged.
 
 ## License
 
