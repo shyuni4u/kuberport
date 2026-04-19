@@ -20,14 +20,88 @@ const LINE_CAP = 2000;
 
 export function LogsPanel({ releaseId, instances }: Props) {
   const [instance, setInstance] = useState("all");
+  const [autoscroll, setAutoscroll] = useState(true);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Toolbar
+        instance={instance}
+        onInstanceChange={setInstance}
+        instances={instances}
+        autoscroll={autoscroll}
+        onAutoscrollChange={setAutoscroll}
+        streamKey={`${releaseId}:${instance}`}
+      >
+        <Stream
+          key={`${releaseId}:${instance}`}
+          releaseId={releaseId}
+          instance={instance}
+          autoscroll={autoscroll}
+        />
+      </Toolbar>
+    </div>
+  );
+}
+
+type ToolbarProps = {
+  instance: string;
+  onInstanceChange: (v: string) => void;
+  instances: { name: string }[];
+  autoscroll: boolean;
+  onAutoscrollChange: (v: boolean) => void;
+  streamKey: string;
+  children: React.ReactNode;
+};
+
+// Toolbar lives in the parent so toggling Auto-scroll / Instance does
+// not unmount the stream (Stream uses key= to remount on releaseId or
+// instance change). The "Clear" action lives inside Stream.
+function Toolbar({
+  instance,
+  onInstanceChange,
+  instances,
+  autoscroll,
+  onAutoscrollChange,
+  children,
+}: ToolbarProps) {
+  return (
+    <>
+      <div className="flex items-center gap-3 text-xs">
+        <Select value={instance} onValueChange={(v) => onInstanceChange(v ?? "all")}>
+          <SelectTrigger className="w-52">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체 인스턴스</SelectItem>
+            {instances.map((i) => (
+              <SelectItem key={i.name} value={i.name}>
+                {i.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <label className="ml-auto inline-flex items-center gap-1">
+          <Switch checked={autoscroll} onCheckedChange={onAutoscrollChange} />
+          Auto-scroll
+        </label>
+      </div>
+      {children}
+    </>
+  );
+}
+
+type StreamProps = {
+  releaseId: string;
+  instance: string;
+  autoscroll: boolean;
+};
+
+function Stream({ releaseId, instance, autoscroll }: StreamProps) {
   const [lines, setLines] = useState<LogEntry[]>([]);
   const [status, setStatus] = useState<Status>("connecting");
-  const [autoscroll, setAutoscroll] = useState(true);
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setLines([]);
-    setStatus("connecting");
     const es = new EventSource(
       `/api/v1/releases/${releaseId}/logs?instance=${encodeURIComponent(instance)}`,
     );
@@ -58,30 +132,13 @@ export function LogsPanel({ releaseId, instances }: Props) {
   }, [lines, autoscroll]);
 
   return (
-    <div className="flex flex-col gap-2">
+    <>
       <div className="flex items-center gap-3 text-xs">
         <ConnectionDot status={status} />
-        <Select value={instance} onValueChange={setInstance}>
-          <SelectTrigger className="w-52">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 인스턴스</SelectItem>
-            {instances.map((i) => (
-              <SelectItem key={i.name} value={i.name}>
-                {i.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <label className="ml-auto inline-flex items-center gap-1">
-          <Switch checked={autoscroll} onCheckedChange={setAutoscroll} />
-          Auto-scroll
-        </label>
         <button
           type="button"
           onClick={() => setLines([])}
-          className="rounded border px-2 py-0.5 hover:bg-slate-50"
+          className="ml-auto rounded border px-2 py-0.5 hover:bg-slate-50"
         >
           Clear
         </button>
@@ -99,7 +156,7 @@ export function LogsPanel({ releaseId, instances }: Props) {
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
