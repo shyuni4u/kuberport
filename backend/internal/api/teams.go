@@ -1,11 +1,14 @@
 package api
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"kuberport/internal/auth"
@@ -28,7 +31,13 @@ func (h *Handlers) CreateTeam(c *gin.Context) {
 		DisplayName: store.PgText(r.DisplayName),
 	})
 	if err != nil {
-		writeError(c, http.StatusConflict, "conflict", err.Error())
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			writeError(c, http.StatusConflict, "conflict", "team name already exists")
+			return
+		}
+		log.Printf("CreateTeam: %v", err)
+		writeError(c, http.StatusInternalServerError, "internal", "failed to create team")
 		return
 	}
 	c.JSON(http.StatusCreated, team)

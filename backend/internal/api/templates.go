@@ -303,20 +303,11 @@ func (h *Handlers) CreateTemplateVersion(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// enforce: at most one draft per template
-	existing, err := h.deps.Store.ListTemplateVersions(ctx, tpl.Name)
-	if err != nil {
-		log.Printf("CreateTemplateVersion list: %v", err)
-		writeError(c, http.StatusInternalServerError, "internal", "failed to list versions")
-		return
-	}
-	for _, v := range existing {
-		if v.Status == "draft" {
-			writeError(c, http.StatusConflict, "conflict",
-				"a draft already exists for this template; publish or delete it before creating a new version")
-			return
-		}
-	}
+	// "at most one draft per template" is enforced by the partial unique
+	// index tv_draft_unique on (template_id) WHERE status = 'draft'. We
+	// rely on it instead of a pre-check loop: avoids the list scan, closes
+	// the check-then-insert race, and the insert's unique-violation is
+	// translated to 409 below.
 
 	u, okAuth := auth.UserFrom(ctx)
 	if !okAuth {
@@ -331,7 +322,7 @@ func (h *Handlers) CreateTemplateVersion(c *gin.Context) {
 	}
 
 	var ver store.TemplateVersion
-	err = h.deps.Store.WithTx(ctx, func(q *store.Queries) error {
+	err := h.deps.Store.WithTx(ctx, func(q *store.Queries) error {
 		user, err := q.UpsertUser(ctx, store.UpsertUserParams{
 			OidcSubject: u.Subject,
 			Email:       store.PgText(u.Email),
@@ -359,6 +350,14 @@ func (h *Handlers) CreateTemplateVersion(c *gin.Context) {
 		return err
 	})
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+			// Partial unique index tv_draft_unique fired: another draft
+			// already exists for this template.
+			writeError(c, http.StatusConflict, "conflict",
+				"a draft already exists for this template; publish or delete it before creating a new version")
+			return
+		}
 		log.Printf("CreateTemplateVersion: %v", err)
 		writeError(c, http.StatusInternalServerError, "internal", "failed to create version")
 		return
