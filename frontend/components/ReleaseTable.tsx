@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { StatusBadge } from "./StatusBadge";
+import { StatusChip, statusChipVariantFromRelease } from "./StatusChip";
 
 interface ReleaseRow {
   id: string;
@@ -25,7 +25,9 @@ export function ReleaseTable({ rows }: { rows: ReleaseRow[] }) {
         {rows.map((r) => (
           <tr key={r.id} className="border-t">
             <td className="p-2">
-              <StatusBadge status={r.status ?? "unknown"} />
+              <StatusChip variant={statusChipVariantFromRelease(r.status ?? "unknown")}>
+                {r.status ?? "unknown"}
+              </StatusChip>
             </td>
             <td className="p-2">
               <Link href={`/releases/${r.id}`} className="text-blue-600">
