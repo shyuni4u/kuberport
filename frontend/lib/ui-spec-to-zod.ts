@@ -79,14 +79,16 @@ export function schemaFromUISpec(spec: UISpec): z.ZodObject<Record<string, ZodTy
       case "boolean":
         zs = z.boolean();
         break;
-      case "enum":
-        if (f.values.length === 0) {
+      case "enum": {
+        const [first, ...rest] = f.values;
+        if (first === undefined) {
           throw new Error(
             `ui-spec field "${f.path}" is enum but has no values`,
           );
         }
-        zs = z.enum(f.values as [string, ...string[]]);
+        zs = z.enum([first, ...rest]);
         break;
+      }
     }
     shape[f.path] = f.required ? zs : zs.optional();
   }
