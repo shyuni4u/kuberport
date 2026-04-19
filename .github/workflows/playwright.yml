@@ -62,7 +62,8 @@ jobs:
       - uses: ariga/setup-atlas@v0
 
       - name: Apply DB schema
-        run: cd backend && atlas schema apply --env local --auto-approve
+        # atlas.hcl lives in backend/migrations/ — matches docs/local-e2e.md §3.
+        run: cd backend/migrations && atlas schema apply --env local --auto-approve
 
       - name: Write kind config
         run: |

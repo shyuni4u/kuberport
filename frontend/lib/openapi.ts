@@ -61,7 +61,8 @@ export function resolveRefs(node: SchemaNode, schemas: Record<string, SchemaNode
   if (node.allOf && node.allOf.length > 0) {
     // Merge each allOf entry into the node; the node's own type/description
     // wins over the allOf target's (that's why description lives on the
-    // parent in k8s OpenAPI).
+    // parent in k8s OpenAPI). `required` and `properties` must be merged,
+    // not overwritten — JSON Schema semantics are "the union of all branches".
     let merged: SchemaNode = {};
     for (const sub of node.allOf) {
       // Clone `seen` per-branch so sibling allOf entries don't interfere with
@@ -71,6 +72,7 @@ export function resolveRefs(node: SchemaNode, schemas: Record<string, SchemaNode
       merged = {
         ...merged,
         ...r,
+        required: Array.from(new Set([...(merged.required ?? []), ...(r.required ?? [])])),
         properties: { ...(merged.properties ?? {}), ...(r.properties ?? {}) },
       };
     }
@@ -79,6 +81,7 @@ export function resolveRefs(node: SchemaNode, schemas: Record<string, SchemaNode
     const combined: SchemaNode = {
       ...merged,
       ...parentWithoutAllOf,
+      required: Array.from(new Set([...(merged.required ?? []), ...(parentWithoutAllOf.required ?? [])])),
       properties: { ...(merged.properties ?? {}), ...(parentWithoutAllOf.properties ?? {}) },
     };
     // Recurse so inner $refs/allOfs inside properties/items also resolve.
