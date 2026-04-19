@@ -237,9 +237,9 @@ curl -s -H "Authorization: Bearer $ADM" -X POST \
 
 ## UI mode (Plan 2)
 
-Once everything from §9 above is running:
+Once everything from §9 and §10 is running (logged in as alice):
 
-1. `http://localhost:3000/admin/teams` → create a team, add yourself as editor.
+1. `http://localhost:3000/admin/teams` → create a team, click the team name, add yourself as editor.
 2. `http://localhost:3000/templates/new` → pick "Deployment", click `spec.replicas` → mark "사용자 노출", click container image → mark "값 고정" = `nginx:1.25`. Name the template, assign the team, save.
 3. Back at `/templates/<name>`, publish v1.
 4. `/catalog` → deploy.
