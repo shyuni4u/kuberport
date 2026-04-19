@@ -235,6 +235,18 @@ curl -s -H "Authorization: Bearer $ADM" -X POST \
 3. Catalog → Web Service → 배포 → fill form → submit
 4. Release detail page should show `healthy` with 1 instance
 
+## UI mode (Plan 2)
+
+Once everything from §9 above is running:
+
+1. `http://localhost:3000/admin/teams` → create a team, add yourself as editor.
+2. `http://localhost:3000/templates/new` → pick "Deployment", click `spec.replicas` → mark "사용자 노출", click container image → mark "값 고정" = `nginx:1.25`. Name the template, assign the team, save.
+3. Back at `/templates/<name>`, publish v1.
+4. `/catalog` → deploy.
+5. `/templates/<name>` → Deprecate v1. Verify:
+   - `/catalog` no longer lists it,
+   - a second deploy attempt returns 400.
+
 ## Troubleshooting
 
 - **`cluster has no ca_bundle` on OpenAPI fetch.** As of the third-round

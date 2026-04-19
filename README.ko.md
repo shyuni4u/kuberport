@@ -5,7 +5,7 @@
 > Kubernetes 를 위한 템플릿 기반 셀프서비스 포털.
 > 관리자는 YAML + ui-spec 템플릿을 발행하고, 비전문 사용자는 추상화된 폼으로 배포·운영한다.
 
-**상태:** Plan 1 (vertical slice) 출시. 로그인 → 클러스터 등록 → YAML 모드 템플릿 발행 → 배포까지 동작한다. Plan 2(Admin UX)는 설계 단계이고, Plan 3(User observability)은 아직 작성 전.
+**상태:** Plan 1·2 출시. 관리자는 UI 에디터로 템플릿을 만들고 팀으로 소유하며 버전을 deprecate할 수 있다. 사용자는 배포·상태 조회가 가능하고 카탈로그에 deprecated 버전은 보이지 않는다. Plan 3(User observability) 미작성.
 
 ---
 
@@ -118,7 +118,7 @@ make e2e
 | # | Plan | 내용 | 링크 |
 |---|------|------|------|
 | 1 | **Vertical slice** | OIDC 로그인, YAML 모드 템플릿 CRUD, 배포 폼, 릴리스 목록·개요 | [plan](docs/superpowers/plans/2026-04-16-mvp-1-vertical-slice.md) ✅ |
-| 2 | **Admin UX** | UI 모드 에디터(트리 + 메타 + 라이브 프리뷰), publish/deprecate, 버전 히스토리 | *(브레인스토밍 → spec → plan 단계)* |
+| 2 | **Admin UX** | UI 모드 에디터(트리 + 메타 + 라이브 프리뷰), publish/deprecate, 버전 히스토리, 팀 | [plan](docs/superpowers/plans/2026-04-18-mvp-2-admin-ux.md) ✅ |
 | 3 | **User observability** | 릴리스 로그(SSE), 이벤트, settings 탭, 업데이트 마이그레이션, 자가호스팅용 Helm chart | *(미작성)* |
 
 MVP 이후로 미룬 것: CRD 지원, Git 연동 템플릿, 팀/RBAC UI, Helm chart 임포트, 릴리스 히스토리.
@@ -149,7 +149,7 @@ kuberport/
 
 ## 기여
 
-아직 외부 기여는 받지 않는다 — 시스템의 모양이 아직 안정화 중이다. Plan 2 스코프가 정리되고 머지되면 이슈·PR 을 받기 시작한다.
+아직 외부 기여는 받지 않는다 — 시스템의 모양이 아직 안정화 중이다. Plan 3 스코프가 정리되고 머지되면 이슈·PR 을 받기 시작한다.
 
 ## 라이선스
 
