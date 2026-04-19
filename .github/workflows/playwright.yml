@@ -107,7 +107,16 @@ jobs:
         # which then resolves the Dex issuer on the next JWKS fetch.
         run: |
           set -eo pipefail
-          GATEWAY=$(docker network inspect kind -f '{{(index .IPAM.Config 0).Gateway}}')
+          # Kind node's default route IS the kind docker network gateway
+          # (i.e. the host-side of the bridge). This works for both IPv4-only
+          # and dual-stack runners without parsing docker network JSON, and
+          # matches what hostNetwork pods see through their shared netns.
+          GATEWAY=$(docker exec kuberport-control-plane sh -c "ip -4 route show default | awk '{print \$3}'" | head -1)
+          if [ -z "$GATEWAY" ]; then
+            echo "could not determine kind node default gateway" >&2
+            docker exec kuberport-control-plane ip route >&2 || true
+            exit 1
+          fi
           echo "gateway: $GATEWAY"
           docker cp kuberport-control-plane:/etc/kubernetes/manifests/kube-apiserver.yaml /tmp/apiserver.yaml
           awk -v gw="$GATEWAY" '
