@@ -5,7 +5,7 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 
 ## 현재 단계
 
-**프론트엔드 재설계 진행 중 — Plan 0·1·2 머지 완료, Plan 3 진행 중, Plan 4 미착수**.
+**프론트엔드 재설계 진행 중 — Plan 0·1·2 머지 완료, Plan 3 PR 리뷰 대기, Plan 4 미착수**.
 
 스펙: [docs/superpowers/specs/2026-04-19-frontend-design-spec.md](docs/superpowers/specs/2026-04-19-frontend-design-spec.md) (4 화면: Admin UI 에디터 / 카탈로그 / 배포 폼 / 릴리스 상세)
 
@@ -16,7 +16,7 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 | 0 | [frontend-foundation](docs/superpowers/plans/2026-04-19-frontend-foundation.md) | ✅ merged (PR #16) | 패키지·shadcn·Vitest·RoleBadge·StatusChip·TopBar 재편·Providers·Zustand·MonacoPanel |
 | 1 | [catalog-redesign](docs/superpowers/plans/2026-04-19-catalog-redesign.md) | ✅ merged (PR #17) | `/catalog` + CatalogCard + 검색/태그 필터 + 아이콘 맵 |
 | 2 | [release-detail-redesign](docs/superpowers/plans/2026-04-19-release-detail-redesign.md) | ✅ merged (PR #18) | 중첩 라우트 + 개요·로그 탭 + **SSE 백엔드 추가** + k8s 용어 토글. UpdateAvailableBadge 는 Plan 3 으로 이월 (`current_version` 정수 필드·`?updateReleaseId=` 라우트 의존). |
-| 3 | [deploy-form-redesign](docs/superpowers/plans/2026-04-19-deploy-form-redesign.md) | 🟡 진행 중 | **백엔드 3개 엔드포인트** (render/PUT releases/SSAR) + shadcn DynamicForm + RBAC 패널 + 업데이트 플로우 |
+| 3 | [deploy-form-redesign](docs/superpowers/plans/2026-04-19-deploy-form-redesign.md) | 🟡 PR #19 리뷰 대기 | **백엔드 3개 엔드포인트** (render/PUT releases/SSAR) + shadcn DynamicForm + RBAC 패널 + 업데이트 플로우 |
 | 4 | [admin-editor-redesign](docs/superpowers/plans/2026-04-19-admin-editor-redesign.md) | ⏳ 미착수 | ResizablePanelGroup + MetaRow + BottomBar + SchemaTree 배지 + FieldInspector enum values + ?mode=ui\|yaml 분기 |
 
 참고 — 초기 디자인: [2026-04-16-initial-design.md](docs/superpowers/specs/2026-04-16-initial-design.md), Plan 2 Admin UX: [2026-04-18-plan2-admin-ux-design.md](docs/superpowers/specs/2026-04-18-plan2-admin-ux-design.md).
