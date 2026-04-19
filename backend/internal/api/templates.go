@@ -98,10 +98,14 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 			writeError(c, http.StatusForbidden, "rbac-denied", "global template requires kuberport-admin")
 			return
 		}
+		// A user not in the DB cannot possibly have a team_memberships row
+		// (FK constraint), so collapse both misses into a single "team editor
+		// required". Matches ensureTemplateEditor (permissions.go). The
+		// "call /v1/me first" hint only makes sense for ListTeamMembers,
+		// where an already-member user might just be unwarm.
 		caller, err := h.deps.Store.GetUserByOidcSubject(ctx, u.Subject)
 		if err != nil {
-			writeError(c, http.StatusForbidden, "rbac-denied",
-				"user not registered yet; call GET /v1/me first, then retry")
+			writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
 			return
 		}
 		mem, err := h.deps.Store.GetTeamMembership(ctx, store.GetTeamMembershipParams{

@@ -57,8 +57,14 @@ func TestMain(m *testing.M) {
 	// so leftover rows from prior integration/unit runs cause 409s. Truncate the
 	// app tables before each e2e run. Only safe because TestMain is gated by
 	// KBP_KIND_API being set — a deliberate opt-in.
+	//
+	// Use `docker compose exec <service>` (not `docker exec <container>`), so the
+	// compose project name derivation doesn't matter — we only rely on the
+	// service name staying "postgres".
 	truncate := `TRUNCATE sessions, team_memberships, teams, releases, template_versions, templates, clusters, users CASCADE`
-	if out, err := exec.Command("docker", "exec", "docker-postgres-1",
+	if out, err := exec.Command("docker", "compose",
+		"-f", "../../deploy/docker/docker-compose.yml",
+		"exec", "-T", "postgres",
 		"psql", "-U", "kuberport", "-d", "kuberport", "-c", truncate).CombinedOutput(); err != nil {
 		fmt.Fprintln(os.Stderr, "db truncate failed:", err, string(out))
 		os.Exit(1)
@@ -170,6 +176,22 @@ func call(t *testing.T, token, method, path string, body any) (int, []byte) {
 	return resp.StatusCode, b
 }
 
+// ensureCluster registers the "kind" cluster via the admin token. Idempotent:
+// 201 on first call within the run, 409 on later calls (another test already
+// registered it). Keeps each test runnable in isolation (`-run TestE2E_Plan2`)
+// without tying ordering to TestE2E_HappyPath.
+func ensureCluster(t *testing.T, adminTok string) {
+	t.Helper()
+	status, body := call(t, adminTok, http.MethodPost, "/v1/clusters", map[string]any{
+		"name":            "kind",
+		"api_url":         os.Getenv("KBP_KIND_API"),
+		"oidc_issuer_url": "https://host.docker.internal:5556",
+	})
+	if status != http.StatusCreated && status != http.StatusConflict {
+		require.FailNow(t, "cluster register failed", "status=%d body=%s", status, body)
+	}
+}
+
 // TestE2E_HappyPath exercises the full vertical slice:
 //   register cluster (admin) → create + publish template (admin) →
 //   deploy release (user) → list → get (poll until healthy) → delete
@@ -188,15 +210,10 @@ func TestE2E_HappyPath(t *testing.T) {
 	userTok := fetchDexIDToken(t, "alice@example.com", "alice")
 
 	// 1. Register cluster (admin)
-	status, body := call(t, adminTok, http.MethodPost, "/v1/clusters", map[string]any{
-		"name":            "kind",
-		"api_url":         os.Getenv("KBP_KIND_API"),
-		"oidc_issuer_url": "https://host.docker.internal:5556",
-	})
-	require.Equal(t, http.StatusCreated, status, string(body))
+	ensureCluster(t, adminTok)
 
 	// 2. Create template (admin) and publish v1
-	status, body = call(t, adminTok, http.MethodPost, "/v1/templates", map[string]any{
+	status, body := call(t, adminTok, http.MethodPost, "/v1/templates", map[string]any{
 		"name":           "web-e2e",
 		"display_name":   "Web E2E",
 		"authoring_mode": "yaml",
@@ -259,10 +276,12 @@ func TestE2E_Plan2_TeamEditorFlow(t *testing.T) {
 	if os.Getenv("KBP_KIND_API") == "" {
 		t.Skip("KBP_KIND_API not set")
 	}
-	// Depends on TestE2E_HappyPath having registered cluster "kind".
-	// Run order: go test -tags=e2e -run "TestE2E_HappyPath|TestE2E_Plan2" -v
 	adminTok := fetchDexIDToken(t, "admin@example.com", "admin")
 	aliceTok := fetchDexIDToken(t, "alice@example.com", "alice")
+
+	// Register cluster up front so this test is runnable on its own
+	// (`go test -run TestE2E_Plan2`) — accepts 409 if HappyPath already did it.
+	ensureCluster(t, adminTok)
 
 	// 1. Create team 'plat' and add alice as editor
 	status, body := call(t, adminTok, http.MethodPost, "/v1/teams",
