@@ -20,6 +20,12 @@ type fakeK8sApplier struct {
 	applied   [][]byte
 	deleted   []string
 	instances []k8s.Instance
+
+	// accessChecks records every CheckAccess call for assertions.
+	// accessResult is the stub response; accessErr overrides it when non-nil.
+	accessChecks []k8s.AccessCheck
+	accessResult k8s.AccessResult
+	accessErr    error
 }
 
 func (f *fakeK8sApplier) ApplyAll(_ context.Context, _ string, y []byte) error {
@@ -47,12 +53,26 @@ func (f *fakeK8sApplier) StreamLogs(ctx context.Context, _ string, _ []string) (
 	return ch, errCh
 }
 
+func (f *fakeK8sApplier) CheckAccess(_ context.Context, spec k8s.AccessCheck) (k8s.AccessResult, error) {
+	f.accessChecks = append(f.accessChecks, spec)
+	if f.accessErr != nil {
+		return k8s.AccessResult{}, f.accessErr
+	}
+	return f.accessResult, nil
+}
+
 // fakeK8sFactory returns the same fakeK8sApplier for every call.
+// When err is non-nil, NewWithToken returns it instead — lets tests exercise
+// the "couldn't build a k8s client" branch of handlers.
 type fakeK8sFactory struct {
 	applier *fakeK8sApplier
+	err     error
 }
 
 func (f *fakeK8sFactory) NewWithToken(_, _, _ string) (api.K8sApplier, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
 	return f.applier, nil
 }
 

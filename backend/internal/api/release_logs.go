@@ -28,15 +28,8 @@ func (h *Handlers) StreamReleaseLogs(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(c) {
-		user, ok := h.resolveUser(c)
-		if !ok {
-			return
-		}
-		if rel.CreatedByUserID != user.ID {
-			writeError(c, http.StatusForbidden, "rbac-denied", "not the release owner")
-			return
-		}
+	if !h.authorizeReleaseAccess(c, rel) {
+		return
 	}
 
 	u, ok := auth.UserFrom(ctx)

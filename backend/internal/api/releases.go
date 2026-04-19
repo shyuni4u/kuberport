@@ -60,6 +60,47 @@ func isAdmin(c *gin.Context) bool {
 	return false
 }
 
+// authorizeReleaseAccess returns true if the caller is an admin or the release's
+// creator. On denial it writes a 403 response and returns false. Callers that
+// already loaded the release should use this before touching k8s / DB so the
+// same rule is applied everywhere (Get/Delete/Update/Logs).
+func (h *Handlers) authorizeReleaseAccess(c *gin.Context, rel store.GetReleaseByIDRow) bool {
+	if isAdmin(c) {
+		return true
+	}
+	user, ok := h.resolveUser(c)
+	if !ok {
+		// resolveUser already wrote a 500.
+		return false
+	}
+	if rel.CreatedByUserID != user.ID {
+		writeError(c, http.StatusForbidden, "rbac-denied", "not the release owner")
+		return false
+	}
+	return true
+}
+
+// requireDeployableVersion writes an error response and returns false when the
+// given template version is not in a state that can back a new or updated
+// release. Shared by CreateRelease and UpdateRelease so the status gate is
+// defined in exactly one place.
+//
+// templateName is passed explicitly because store.TemplateVersion does not
+// carry it (sqlc row shape) and the error message wants to identify the
+// template.
+func requireDeployableVersion(c *gin.Context, tv store.TemplateVersion, templateName string) bool {
+	if tv.Status == "deprecated" {
+		writeError(c, http.StatusBadRequest, "validation-error",
+			"template "+templateName+" v"+strconv.Itoa(int(tv.Version))+" is deprecated; pick a non-deprecated version")
+		return false
+	}
+	if tv.Status != "published" {
+		writeError(c, http.StatusConflict, "conflict", "version not published")
+		return false
+	}
+	return true
+}
+
 // parsePagination extracts limit/offset from query params with defaults.
 func parsePagination(c *gin.Context) (limit, offset int32) {
 	limit = defaultPageLimit
@@ -93,13 +134,7 @@ func (h *Handlers) CreateRelease(c *gin.Context) {
 		writeError(c, http.StatusNotFound, "not-found", "template version")
 		return
 	}
-	if tv.Status == "deprecated" {
-		writeError(c, http.StatusBadRequest, "validation-error",
-			"template "+r.Template+" v"+strconv.Itoa(int(tv.Version))+" is deprecated; pick a non-deprecated version")
-		return
-	}
-	if tv.Status != "published" {
-		writeError(c, http.StatusConflict, "conflict", "version not published")
+	if !requireDeployableVersion(c, tv, r.Template) {
 		return
 	}
 
@@ -226,15 +261,8 @@ func (h *Handlers) GetRelease(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(c) {
-		user, ok := h.resolveUser(c)
-		if !ok {
-			return
-		}
-		if rel.CreatedByUserID != user.ID {
-			writeError(c, http.StatusForbidden, "rbac-denied", "not the release owner")
-			return
-		}
+	if !h.authorizeReleaseAccess(c, rel) {
+		return
 	}
 
 	u, ok := auth.UserFrom(ctx)
@@ -327,15 +355,8 @@ func (h *Handlers) DeleteRelease(c *gin.Context) {
 		return
 	}
 
-	if !isAdmin(c) {
-		user, ok := h.resolveUser(c)
-		if !ok {
-			return
-		}
-		if rel.CreatedByUserID != user.ID {
-			writeError(c, http.StatusForbidden, "rbac-denied", "not the release owner")
-			return
-		}
+	if !h.authorizeReleaseAccess(c, rel) {
+		return
 	}
 
 	cli, err := h.deps.K8sFactory.NewWithToken(rel.ClusterApiUrl, rel.ClusterCaBundle.String, u.IDToken)

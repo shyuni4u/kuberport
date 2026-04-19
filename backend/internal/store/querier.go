@@ -25,6 +25,7 @@ type Querier interface {
 	GetTeamMembership(ctx context.Context, arg GetTeamMembershipParams) (TeamMembership, error)
 	GetTemplateByName(ctx context.Context, name string) (Template, error)
 	GetTemplateVersion(ctx context.Context, arg GetTemplateVersionParams) (TemplateVersion, error)
+	GetTemplateVersionByID(ctx context.Context, id pgtype.UUID) (TemplateVersion, error)
 	GetUserByEmail(ctx context.Context, email pgtype.Text) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByOidcSubject(ctx context.Context, oidcSubject string) (User, error)
@@ -47,6 +48,7 @@ type Querier interface {
 	NextTemplateVersion(ctx context.Context, templateID pgtype.UUID) (int32, error)
 	PublishTemplateVersion(ctx context.Context, id pgtype.UUID) (TemplateVersion, error)
 	SetTemplateVersionStatus(ctx context.Context, arg SetTemplateVersionStatusParams) (TemplateVersion, error)
+	UpdateReleaseValuesAndVersion(ctx context.Context, arg UpdateReleaseValuesAndVersionParams) error
 	UpdateSessionTokens(ctx context.Context, arg UpdateSessionTokensParams) error
 	UpdateTemplateCurrentVersion(ctx context.Context, arg UpdateTemplateCurrentVersionParams) error
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)

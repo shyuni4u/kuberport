@@ -30,6 +30,9 @@ SELECT tv.* FROM template_versions tv
   JOIN templates t ON t.id = tv.template_id
  WHERE t.name = $1 AND tv.version = $2;
 
+-- name: GetTemplateVersionByID :one
+SELECT * FROM template_versions WHERE id = $1;
+
 -- name: PublishTemplateVersion :one
 UPDATE template_versions
    SET status = 'published', published_at = now()

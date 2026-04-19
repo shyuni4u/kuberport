@@ -17,6 +17,9 @@ type K8sApplier interface {
 	DeleteByRelease(ctx context.Context, namespace, release string) error
 	ListInstances(ctx context.Context, namespace, release string) ([]k8s.Instance, error)
 	StreamLogs(ctx context.Context, namespace string, pods []string) (<-chan k8s.LogLine, <-chan error)
+	// CheckAccess proxies a SelfSubjectAccessReview so the caller can ask
+	// "can I do verb on resource?" before attempting an action.
+	CheckAccess(ctx context.Context, spec k8s.AccessCheck) (k8s.AccessResult, error)
 }
 
 // K8sClientFactory creates per-request k8s clients using the caller's token.
@@ -48,9 +51,11 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 	v.GET("/clusters/:name/openapi", h.GetOpenAPIIndex)
 	v.GET("/clusters/:name/openapi/*gv", h.GetOpenAPIGroupVersion)
 	v.POST("/clusters/:name/openapi/refresh", h.RefreshOpenAPI)
+	v.POST("/selfsubjectaccessreview", h.CheckSelfSubjectAccess)
 	v.GET("/templates", h.ListTemplates)
 	v.POST("/templates", h.CreateTemplate)
 	v.POST("/templates/preview", h.PreviewTemplate)
+	v.POST("/templates/:name/render", h.PreviewRender)
 	v.GET("/templates/:name", h.GetTemplate)
 	v.GET("/templates/:name/versions", h.ListTemplateVersions)
 	v.POST("/templates/:name/versions", h.CreateTemplateVersion)
@@ -62,6 +67,7 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 	v.POST("/releases", h.CreateRelease)
 	v.GET("/releases/:id", h.GetRelease)
 	v.GET("/releases/:id/logs", h.StreamReleaseLogs)
+	v.PUT("/releases/:id", h.UpdateRelease)
 	v.DELETE("/releases/:id", h.DeleteRelease)
 	v.GET("/teams", h.ListTeams)
 	v.POST("/teams", requireAdmin(), h.CreateTeam)
