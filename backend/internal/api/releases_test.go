@@ -36,6 +36,17 @@ func (f *fakeK8sApplier) ListInstances(_ context.Context, _, _ string) ([]k8s.In
 	return f.instances, nil
 }
 
+func (f *fakeK8sApplier) StreamLogs(ctx context.Context, _ string, _ []string) (<-chan k8s.LogLine, <-chan error) {
+	ch := make(chan k8s.LogLine)
+	errCh := make(chan error)
+	go func() {
+		<-ctx.Done()
+		close(ch)
+		close(errCh)
+	}()
+	return ch, errCh
+}
+
 // fakeK8sFactory returns the same fakeK8sApplier for every call.
 type fakeK8sFactory struct {
 	applier *fakeK8sApplier

@@ -16,6 +16,11 @@ type LogLine struct {
 	Text string `json:"text"`
 }
 
+// StreamLogs follows logs from the named pods in this client's cluster.
+func (c *Client) StreamLogs(ctx context.Context, namespace string, pods []string) (<-chan LogLine, <-chan error) {
+	return StreamPodLogs(ctx, c.cs, namespace, pods)
+}
+
 // StreamPodLogs follows logs from multiple pods concurrently and fans
 // them into a single channel. ch closes when ctx is done or when all
 // pods stop emitting. errCh closes after ch closes.

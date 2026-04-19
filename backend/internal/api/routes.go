@@ -16,6 +16,7 @@ type K8sApplier interface {
 	ApplyAll(ctx context.Context, ns string, yaml []byte) error
 	DeleteByRelease(ctx context.Context, namespace, release string) error
 	ListInstances(ctx context.Context, namespace, release string) ([]k8s.Instance, error)
+	StreamLogs(ctx context.Context, namespace string, pods []string) (<-chan k8s.LogLine, <-chan error)
 }
 
 // K8sClientFactory creates per-request k8s clients using the caller's token.
@@ -60,6 +61,7 @@ func NewRouter(cfg config.Config, deps Deps) *gin.Engine {
 	v.GET("/releases", h.ListReleases)
 	v.POST("/releases", h.CreateRelease)
 	v.GET("/releases/:id", h.GetRelease)
+	v.GET("/releases/:id/logs", h.StreamReleaseLogs)
 	v.DELETE("/releases/:id", h.DeleteRelease)
 	v.GET("/teams", h.ListTeams)
 	v.POST("/teams", requireAdmin(), h.CreateTeam)
