@@ -98,15 +98,48 @@ jobs:
           cluster_name: kuberport
           config: /tmp/kind-config.yaml
 
-      - name: Expose host.docker.internal inside kind node
+      - name: Expose host.docker.internal to kube-apiserver
         # GitHub Actions Linux runners do not auto-inject host.docker.internal
-        # into container /etc/hosts the way Docker Desktop does. Without this,
-        # kube-apiserver cannot resolve the Dex issuer URL to fetch JWKS and
-        # rejects every OIDC token with 401 — playwright then sees an empty
-        # schema tree in test 02 (no `replicas` node) and the test times out.
+        # into container networking (Docker Desktop does). The kube-apiserver
+        # static pod has its OWN /etc/hosts — modifying the kind node's
+        # /etc/hosts is not enough. Patch the static pod manifest to add a
+        # hostAliases entry; kubelet detects the change and restarts apiserver,
+        # which then resolves the Dex issuer on the next JWKS fetch.
         run: |
+          set -eo pipefail
           GATEWAY=$(docker network inspect kind -f '{{(index .IPAM.Config 0).Gateway}}')
+          echo "gateway: $GATEWAY"
+          docker cp kuberport-control-plane:/etc/kubernetes/manifests/kube-apiserver.yaml /tmp/apiserver.yaml
+          awk -v gw="$GATEWAY" '
+            /^spec:$/ && !done {
+              print
+              print "  hostAliases:"
+              print "  - ip: " gw
+              print "    hostnames:"
+              print "    - host.docker.internal"
+              done = 1
+              next
+            }
+            { print }
+          ' /tmp/apiserver.yaml > /tmp/apiserver-patched.yaml
+          docker cp /tmp/apiserver-patched.yaml kuberport-control-plane:/etc/kubernetes/manifests/kube-apiserver.yaml
+          # Also patch the node /etc/hosts for good measure (anything that execs
+          # in the node directly, e.g. crictl debug, benefits from resolution).
           docker exec kuberport-control-plane sh -c "echo '$GATEWAY host.docker.internal' >> /etc/hosts"
+          # Wait for kubelet to pick up the manifest change and restart apiserver.
+          for i in $(seq 1 40); do
+            if kubectl --context kind-kuberport get --raw /healthz 2>/dev/null | grep -q ok; then
+              echo "apiserver healthy after patch (attempt $i)"
+              break
+            fi
+            sleep 3
+          done
+          # Confirm the patch landed in the running pod by sampling its /etc/hosts.
+          docker exec kuberport-control-plane sh -c '
+            set -e
+            CID=$(crictl ps -q --name kube-apiserver | head -1)
+            crictl exec "$CID" cat /etc/hosts
+          '
 
       - name: Build backend
         run: cd backend && go build -o ../bin/kuberport-server ./cmd/server
