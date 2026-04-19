@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -99,19 +100,33 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 			return
 		}
 		// A user not in the DB cannot possibly have a team_memberships row
-		// (FK constraint), so collapse both misses into a single "team editor
-		// required". Matches ensureTemplateEditor (permissions.go). The
-		// "call /v1/me first" hint only makes sense for ListTeamMembers,
-		// where an already-member user might just be unwarm.
+		// (FK constraint), so both "no user row" and "no membership row"
+		// resolve to the same "team editor required". System errors
+		// (DB down, etc.) bubble up as 500 so the caller doesn't get a
+		// misleading permission message.
 		caller, err := h.deps.Store.GetUserByOidcSubject(ctx, u.Subject)
 		if err != nil {
-			writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
+				return
+			}
+			log.Printf("CreateTemplate: GetUserByOidcSubject: %v", err)
+			writeError(c, http.StatusInternalServerError, "internal", "failed to resolve caller")
 			return
 		}
 		mem, err := h.deps.Store.GetTeamMembership(ctx, store.GetTeamMembershipParams{
 			TeamID: owning, UserID: caller.ID,
 		})
-		if err != nil || mem.Role != "editor" {
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
+				return
+			}
+			log.Printf("CreateTemplate: GetTeamMembership: %v", err)
+			writeError(c, http.StatusInternalServerError, "internal", "failed to resolve membership")
+			return
+		}
+		if mem.Role != "editor" {
 			writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
 			return
 		}

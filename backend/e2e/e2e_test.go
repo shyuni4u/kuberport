@@ -172,7 +172,8 @@ func call(t *testing.T, token, method, path string, body any) (int, []byte) {
 	t.Helper()
 	resp := doAPI(t, token, method, path, body)
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
 	return resp.StatusCode, b
 }
 
