@@ -65,6 +65,31 @@ func (q *Queries) GetTemplateVersion(ctx context.Context, arg GetTemplateVersion
 	return i, err
 }
 
+const getTemplateVersionByID = `-- name: GetTemplateVersionByID :one
+SELECT id, template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml, status, notes, created_by_user_id, created_at, published_at, authoring_mode, ui_state_json FROM template_versions WHERE id = $1
+`
+
+func (q *Queries) GetTemplateVersionByID(ctx context.Context, id pgtype.UUID) (TemplateVersion, error) {
+	row := q.db.QueryRow(ctx, getTemplateVersionByID, id)
+	var i TemplateVersion
+	err := row.Scan(
+		&i.ID,
+		&i.TemplateID,
+		&i.Version,
+		&i.ResourcesYaml,
+		&i.UiSpecYaml,
+		&i.MetadataYaml,
+		&i.Status,
+		&i.Notes,
+		&i.CreatedByUserID,
+		&i.CreatedAt,
+		&i.PublishedAt,
+		&i.AuthoringMode,
+		&i.UiStateJson,
+	)
+	return i, err
+}
+
 const insertTemplate = `-- name: InsertTemplate :one
 INSERT INTO templates (name, display_name, description, tags, owner_user_id)
 VALUES ($1, $2, $3, $4, $5) RETURNING id, name, display_name, description, tags, owner_user_id, current_version_id, created_at, updated_at, owning_team_id

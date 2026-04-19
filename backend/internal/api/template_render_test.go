@@ -4,58 +4,41 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"kuberport/internal/api"
-	"kuberport/internal/config"
 )
 
 // TestPreviewRender_NotFound: POST /v1/templates/:name/render for an unknown
-// template returns 404. Uses direct router with stubVerifier + testStore so
-// the handler reaches the Store lookup path (not an earlier validation branch).
+// template returns 404. Uses the standard admin router so auth passes and the
+// handler reaches the Store lookup.
 func TestPreviewRender_NotFound(t *testing.T) {
-	r := api.NewRouter(config.Config{}, api.Deps{
-		Verifier: stubVerifier{},
-		Store:    testStore(t),
-	})
+	r := newTestRouterAdmin(t)
 	body, _ := json.Marshal(map[string]any{"values": map[string]any{}})
-	req := httptest.NewRequest(http.MethodPost, "/v1/templates/does-not-exist/render", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer x")
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w := do(t, r, http.MethodPost, "/v1/templates/does-not-exist/render", bytes.NewReader(body))
 	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 	require.Contains(t, w.Body.String(), "not-found")
 }
 
-// TestPreviewRender_BadJSON: malformed request body → 400. Route is matched
-// first (auth passes), so the handler's JSON bind fails before any DB call.
+// TestPreviewRender_BadJSON: malformed request body → 400. Uses the same
+// router setup as the positive-path tests so the negative path isn't a
+// fragile lookalike (an earlier version stubbed only the Verifier, which
+// would silently diverge from the router wiring exercised elsewhere).
 func TestPreviewRender_BadJSON(t *testing.T) {
-	r := api.NewRouter(config.Config{}, api.Deps{Verifier: stubVerifier{}})
-	req := httptest.NewRequest(http.MethodPost, "/v1/templates/anything/render",
+	r := newTestRouterAdmin(t)
+	w := do(t, r, http.MethodPost, "/v1/templates/anything/render",
 		strings.NewReader("{not json"))
-	req.Header.Set("Authorization", "Bearer x")
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
 	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	require.Contains(t, w.Body.String(), "validation-error")
 }
 
 // TestPreviewRender_InvalidVersionParam: ?version=foo → 400.
 func TestPreviewRender_InvalidVersionParam(t *testing.T) {
-	r := api.NewRouter(config.Config{}, api.Deps{Verifier: stubVerifier{}})
+	r := newTestRouterAdmin(t)
 	body, _ := json.Marshal(map[string]any{"values": map[string]any{}})
-	req := httptest.NewRequest(http.MethodPost, "/v1/templates/anything/render?version=foo",
+	w := do(t, r, http.MethodPost, "/v1/templates/anything/render?version=foo",
 		bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer x")
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
 	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	require.Contains(t, w.Body.String(), "validation-error")
 }
@@ -73,12 +56,7 @@ func TestPreviewRender_Success(t *testing.T) {
 			"Deployment[web].spec.replicas": 7,
 		},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/templates/"+name+"/render",
-		bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer x")
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w := do(t, r, http.MethodPost, "/v1/templates/"+name+"/render", bytes.NewReader(body))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 	var got struct {
@@ -104,12 +82,7 @@ func TestPreviewRender_ExplicitVersion(t *testing.T) {
 			"Deployment[web].spec.replicas": 3,
 		},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/templates/"+name+"/render?version=1",
-		bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer x")
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w := do(t, r, http.MethodPost, "/v1/templates/"+name+"/render?version=1", bytes.NewReader(body))
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
 	var got map[string]any
@@ -124,12 +97,7 @@ func TestPreviewRender_UnknownVersion(t *testing.T) {
 	name := seedPublishedTemplate(t, r)
 
 	body, _ := json.Marshal(map[string]any{"values": map[string]any{}})
-	req := httptest.NewRequest(http.MethodPost, "/v1/templates/"+name+"/render?version=99",
-		bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer x")
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w := do(t, r, http.MethodPost, "/v1/templates/"+name+"/render?version=99", bytes.NewReader(body))
 	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 }
 
@@ -149,13 +117,8 @@ func TestPreviewRender_NoPublishedVersion(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 
 	body, _ := json.Marshal(map[string]any{"values": map[string]any{}})
-	req := httptest.NewRequest(http.MethodPost, "/v1/templates/"+name+"/render",
-		bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer x")
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
+	w = do(t, r, http.MethodPost, "/v1/templates/"+name+"/render", bytes.NewReader(body))
+	require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 }
 
 // TestPreviewRender_RenderError: invalid value (fails ui-spec pattern/type
@@ -170,12 +133,7 @@ func TestPreviewRender_RenderError(t *testing.T) {
 			"Deployment[web].spec.replicas": 999,
 		},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/v1/templates/"+name+"/render",
-		bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer x")
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w := do(t, r, http.MethodPost, "/v1/templates/"+name+"/render", bytes.NewReader(body))
 	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	require.Contains(t, w.Body.String(), "validation-error")
 }

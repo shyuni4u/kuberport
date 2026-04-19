@@ -25,6 +25,7 @@ type Querier interface {
 	GetTeamMembership(ctx context.Context, arg GetTeamMembershipParams) (TeamMembership, error)
 	GetTemplateByName(ctx context.Context, name string) (Template, error)
 	GetTemplateVersion(ctx context.Context, arg GetTemplateVersionParams) (TemplateVersion, error)
+	GetTemplateVersionByID(ctx context.Context, id pgtype.UUID) (TemplateVersion, error)
 	GetUserByEmail(ctx context.Context, email pgtype.Text) (User, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByOidcSubject(ctx context.Context, oidcSubject string) (User, error)
