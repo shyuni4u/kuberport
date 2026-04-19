@@ -1,4 +1,5 @@
 import { StatusChip, statusChipVariantFromRelease } from "@/components/StatusChip";
+import { KubeTermsToggle } from "@/components/KubeTermsToggle";
 
 export type ReleaseHeaderData = {
   id: string;
@@ -18,6 +19,9 @@ export function ReleaseHeader({ data }: { data: ReleaseHeaderData }) {
         <StatusChip variant={statusChipVariantFromRelease(data.status)}>
           {data.status}
         </StatusChip>
+        <div className="ml-auto">
+          <KubeTermsToggle />
+        </div>
       </div>
       <div className="text-sm text-slate-600">
         {data.template.name} v{data.template.version} · {data.cluster} / {data.namespace}
