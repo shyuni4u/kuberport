@@ -1,76 +1,38 @@
-import { StatusChip, statusChipVariantFromRelease } from "@/components/StatusChip";
 import { apiFetch } from "@/lib/api-server";
+import { notFound } from "next/navigation";
+import { MetricCards } from "@/components/MetricCards";
+import { InstancesTable, type Instance } from "@/components/InstancesTable";
 
-interface ReleaseDetail {
+type ReleaseOverview = {
   id: string;
-  name: string;
-  status: string;
-  template?: { name: string; version: number };
-  cluster: string;
-  namespace: string;
   instances_total: number;
   instances_ready: number;
-  created_at: string;
-}
+  instances: Instance[];
+};
 
-function Card({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="bg-white border rounded p-4">
-      <div className="text-xs uppercase text-slate-500 mb-2">{title}</div>
-      {children}
-    </div>
-  );
-}
-
-export default async function ReleaseDetailPage({
+export default async function ReleaseOverviewPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
   const res = await apiFetch(`/v1/releases/${id}`);
-  if (!res.ok) {
-    return (
-      <div className="text-red-600">
-        릴리스를 불러올 수 없습니다 ({res.status})
-      </div>
-    );
-  }
-  const d: ReleaseDetail = await res.json();
+  if (!res.ok) notFound();
+  const d = (await res.json()) as ReleaseOverview;
+  const restarts = d.instances.reduce((s, i) => s + i.restarts, 0);
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-4">
-        <h1 className="text-xl font-bold">{d.name}</h1>
-        <StatusChip variant={statusChipVariantFromRelease(d.status)}>{d.status}</StatusChip>
-        <span className="text-slate-500 text-sm">
-          {d.template?.name}@v{d.template?.version}
-        </span>
-      </div>
-      <div className="grid grid-cols-3 gap-4">
-        <Card title="상태 요약">
-          <div className="text-2xl font-bold">
-            {d.instances_ready}/{d.instances_total} 준비됨
-          </div>
-        </Card>
-        <Card title="클러스터">
-          <div>
-            {d.cluster} /{" "}
-            <span className="font-mono">{d.namespace}</span>
-          </div>
-        </Card>
-        <Card title="생성">
-          <div className="text-sm text-slate-600">
-            {new Date(d.created_at).toLocaleString()}
-          </div>
-        </Card>
-      </div>
+    <div className="flex flex-col gap-6">
+      <MetricCards
+        readyTotal={[d.instances_ready, d.instances_total]}
+        restarts={restarts}
+        memory={null}
+        accessURL={null}
+      />
+      <section>
+        <h2 className="mb-2 text-sm font-medium">인스턴스 ({d.instances.length})</h2>
+        <InstancesTable releaseId={d.id} instances={d.instances} />
+      </section>
     </div>
   );
 }

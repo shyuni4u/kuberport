@@ -4,11 +4,13 @@ import (
 	"errors"
 
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 type Client struct {
 	dyn dynamic.Interface
+	cs  kubernetes.Interface
 }
 
 // NewWithToken creates a k8s dynamic client using a bearer token.
@@ -41,5 +43,9 @@ func newClient(cfg *rest.Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{dyn: dyn}, nil
+	cs, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{dyn: dyn, cs: cs}, nil
 }
