@@ -1,7 +1,8 @@
 -- name: ListTemplates :many
-SELECT t.*,
+SELECT t.id, t.name, t.display_name, t.description, t.tags, t.owner_user_id, t.current_version_id, t.created_at, t.updated_at, t.owning_team_id,
        tv.version    AS current_version,
-       tv.ui_spec_yaml AS current_ui_spec
+       tv.ui_spec_yaml AS current_ui_spec,
+       tv.status     AS current_status
   FROM templates t
   LEFT JOIN template_versions tv ON tv.id = t.current_version_id
  ORDER BY t.name;

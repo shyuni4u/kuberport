@@ -284,7 +284,8 @@ func (q *Queries) ListTemplateVersions(ctx context.Context, name string) ([]Temp
 const listTemplates = `-- name: ListTemplates :many
 SELECT t.id, t.name, t.display_name, t.description, t.tags, t.owner_user_id, t.current_version_id, t.created_at, t.updated_at, t.owning_team_id,
        tv.version    AS current_version,
-       tv.ui_spec_yaml AS current_ui_spec
+       tv.ui_spec_yaml AS current_ui_spec,
+       tv.status     AS current_status
   FROM templates t
   LEFT JOIN template_versions tv ON tv.id = t.current_version_id
  ORDER BY t.name
@@ -303,6 +304,7 @@ type ListTemplatesRow struct {
 	OwningTeamID     pgtype.UUID        `json:"owning_team_id"`
 	CurrentVersion   pgtype.Int4        `json:"current_version"`
 	CurrentUiSpec    pgtype.Text        `json:"current_ui_spec"`
+	CurrentStatus    pgtype.Text        `json:"current_status"`
 }
 
 func (q *Queries) ListTemplates(ctx context.Context) ([]ListTemplatesRow, error) {
@@ -327,6 +329,7 @@ func (q *Queries) ListTemplates(ctx context.Context) ([]ListTemplatesRow, error)
 			&i.OwningTeamID,
 			&i.CurrentVersion,
 			&i.CurrentUiSpec,
+			&i.CurrentStatus,
 		); err != nil {
 			return nil, err
 		}
