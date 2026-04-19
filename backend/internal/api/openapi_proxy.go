@@ -32,7 +32,6 @@ type openapiCacheEntry struct {
 
 type openapiProxy struct {
 	cache      *lru.Cache[openapiCacheKey, openapiCacheEntry]
-	mu         sync.Mutex
 	transports sync.Map // map[string]http.RoundTripper, key = caBundle string (empty ok)
 }
 
@@ -85,10 +84,10 @@ func (h *Handlers) RefreshOpenAPI(c *gin.Context) {
 		writeError(c, http.StatusUnauthorized, "unauthenticated", "user not in context")
 		return
 	}
-	h.openapi.mu.Lock()
-	defer h.openapi.mu.Unlock()
-	// Cache is LRU-bounded (default 64 entries, KBP_OPENAPI_CACHE_MAX).
-	// O(N) iteration under the mutex is fine at this scale.
+	// hashicorp/golang-lru/v2 is internally synchronized; no external mutex
+	// is needed. Keys() returns a snapshot, so a concurrent Add during the
+	// loop is fine (it simply won't be observed and the TTL check catches
+	// staleness on the next read).
 	for _, k := range h.openapi.cache.Keys() {
 		if k.cluster == cluster && k.user == u.Subject {
 			h.openapi.cache.Remove(k)
@@ -179,7 +178,11 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 // KBP_DEV_ALLOW_INSECURE_CLUSTERS=true locally (e.g. for kind with self-
 // signed certs) to opt into InsecureSkipVerify. Never set this in prod.
 func buildTransport(caBundle string) (http.RoundTripper, error) {
-	t := http.DefaultTransport.(*http.Transport).Clone()
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return nil, errors.New("http.DefaultTransport is not *http.Transport")
+	}
+	t := base.Clone()
 	if strings.TrimSpace(caBundle) == "" {
 		if os.Getenv("KBP_DEV_ALLOW_INSECURE_CLUSTERS") != "true" {
 			return nil, errors.New("cluster has no ca_bundle; set KBP_DEV_ALLOW_INSECURE_CLUSTERS=true for local dev")

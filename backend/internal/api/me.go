@@ -9,23 +9,30 @@ import (
 	"kuberport/internal/store"
 )
 
-// GetMe returns the caller's claims and also serves as the single write-on-read
-// warm-up path: every /v1/me hit upserts the user row so subsequent read-only
-// endpoints (ListTeams, ListTeamMembers, ensureTemplateEditor) can look the
-// caller up by oidc_subject without touching the DB in write mode.
+// GetMe returns the caller's claims and is the warm-up path that ensures a
+// users row exists for subsequent read-only lookups (ListTeams,
+// ListTeamMembers, ensureTemplateEditor). We GET-first and only UpsertUser on
+// miss or when the cached email/display_name drift from the ID-token claims,
+// to keep /v1/me off the write path on the hot call pattern.
 func (h *Handlers) GetMe(c *gin.Context) {
 	u, ok := auth.UserFrom(c.Request.Context())
 	if !ok {
 		writeError(c, http.StatusUnauthorized, "unauthenticated", "user not in context")
 		return
 	}
-	if _, err := h.deps.Store.UpsertUser(c, store.UpsertUserParams{
-		OidcSubject: u.Subject,
-		Email:       store.PgText(u.Email),
-		DisplayName: store.PgText(u.Name),
-	}); err != nil {
-		writeError(c, http.StatusInternalServerError, "internal", err.Error())
-		return
+	existing, err := h.deps.Store.GetUserByOidcSubject(c, u.Subject)
+	needWrite := err != nil ||
+		existing.Email.String != u.Email ||
+		existing.DisplayName.String != u.Name
+	if needWrite {
+		if _, err := h.deps.Store.UpsertUser(c, store.UpsertUserParams{
+			OidcSubject: u.Subject,
+			Email:       store.PgText(u.Email),
+			DisplayName: store.PgText(u.Name),
+		}); err != nil {
+			writeError(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"subject": u.Subject,
