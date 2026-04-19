@@ -91,6 +91,28 @@ func (h *Handlers) CreateTemplate(c *gin.Context) {
 		owning = pgtype.UUID{Bytes: parsed, Valid: true}
 	}
 
+	// Auth: global templates (no owning team) require kuberport-admin.
+	// Team templates require admin OR an editor role in the target team.
+	if !isKuberportAdmin(u) {
+		if !owning.Valid {
+			writeError(c, http.StatusForbidden, "rbac-denied", "global template requires kuberport-admin")
+			return
+		}
+		caller, err := h.deps.Store.GetUserByOidcSubject(ctx, u.Subject)
+		if err != nil {
+			writeError(c, http.StatusForbidden, "rbac-denied",
+				"user not registered yet; call GET /v1/me first, then retry")
+			return
+		}
+		mem, err := h.deps.Store.GetTeamMembership(ctx, store.GetTeamMembershipParams{
+			TeamID: owning, UserID: caller.ID,
+		})
+		if err != nil || mem.Role != "editor" {
+			writeError(c, http.StatusForbidden, "rbac-denied", "team editor required")
+			return
+		}
+	}
+
 	var uiStateJSON []byte
 	if r.UIState != nil {
 		b, _ := json.Marshal(r.UIState)
@@ -207,6 +229,9 @@ func (h *Handlers) GetTemplateVersion(c *gin.Context) {
 
 func (h *Handlers) PublishVersion(c *gin.Context) {
 	ctx := c.Request.Context()
+	if _, ok := h.ensureTemplateEditor(c, c.Param("name")); !ok {
+		return
+	}
 	v64, err := strconv.ParseInt(c.Param("v"), 10, 32)
 	if err != nil {
 		writeError(c, http.StatusBadRequest, "validation-error", "version must be integer")
