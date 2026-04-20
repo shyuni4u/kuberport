@@ -38,10 +38,13 @@ func TestTemplates_CreateListPublish(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Body.String(), `"status":"draft"`)
 
-	// get template by name
+	// get template by name — before publish: current_version is null,
+	// owning_team_name is null (global template), but fields are present.
 	w = do(t, r, http.MethodGet, "/v1/templates/"+name, nil)
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Contains(t, w.Body.String(), name)
+	require.Contains(t, w.Body.String(), `"current_version":`)
+	require.Contains(t, w.Body.String(), `"owning_team_name":`)
 
 	// get specific version
 	w = do(t, r, http.MethodGet, "/v1/templates/"+name+"/versions/1", nil)
@@ -52,6 +55,11 @@ func TestTemplates_CreateListPublish(t *testing.T) {
 	w = do(t, r, http.MethodPost, "/v1/templates/"+name+"/versions/1/publish", nil)
 	require.Equal(t, http.StatusOK, w.Code, "publish body=%s", w.Body.String())
 	require.Contains(t, w.Body.String(), `"status":"published"`)
+
+	// after publish: current_version should be 1 (integer)
+	w = do(t, r, http.MethodGet, "/v1/templates/"+name, nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"current_version":1`)
 
 	// republish should 409 (not in draft state)
 	w = do(t, r, http.MethodPost, "/v1/templates/"+name+"/versions/1/publish", nil)

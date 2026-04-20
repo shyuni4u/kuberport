@@ -8,7 +8,15 @@ SELECT t.id, t.name, t.display_name, t.description, t.tags, t.owner_user_id, t.c
  ORDER BY t.name;
 
 -- name: GetTemplateByName :one
-SELECT * FROM templates WHERE name = $1;
+SELECT t.id, t.name, t.display_name, t.description, t.tags,
+       t.owner_user_id, t.current_version_id, t.created_at, t.updated_at,
+       t.owning_team_id,
+       tv.version AS current_version,
+       team.name  AS owning_team_name
+  FROM templates t
+  LEFT JOIN template_versions tv ON tv.id = t.current_version_id
+  LEFT JOIN teams team            ON team.id = t.owning_team_id
+ WHERE t.name = $1;
 
 -- name: InsertTemplate :one
 INSERT INTO templates (name, display_name, description, tags, owner_user_id)

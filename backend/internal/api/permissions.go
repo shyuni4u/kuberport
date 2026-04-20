@@ -61,11 +61,11 @@ func (h *Handlers) ensureTeamEditor(c *gin.Context, teamID pgtype.UUID) bool {
 // Rules:
 // - Global template (owning_team_id null): caller must be kuberport-admin.
 // - Team template: caller must be a team editor OR kuberport-admin.
-func (h *Handlers) ensureTemplateEditor(c *gin.Context, name string) (store.Template, bool) {
+func (h *Handlers) ensureTemplateEditor(c *gin.Context, name string) (store.GetTemplateByNameRow, bool) {
 	tpl, err := h.deps.Store.GetTemplateByName(c, name)
 	if err != nil {
 		writeError(c, http.StatusNotFound, "not-found", "template "+name)
-		return store.Template{}, false
+		return store.GetTemplateByNameRow{}, false
 	}
 	u, _ := auth.UserFrom(c.Request.Context())
 
@@ -75,11 +75,11 @@ func (h *Handlers) ensureTemplateEditor(c *gin.Context, name string) (store.Temp
 
 	if !tpl.OwningTeamID.Valid {
 		writeError(c, http.StatusForbidden, "rbac-denied", "global template requires kuberport-admin")
-		return store.Template{}, false
+		return store.GetTemplateByNameRow{}, false
 	}
 
 	if !h.ensureTeamEditor(c, tpl.OwningTeamID) {
-		return store.Template{}, false
+		return store.GetTemplateByNameRow{}, false
 	}
 	return tpl, true
 }

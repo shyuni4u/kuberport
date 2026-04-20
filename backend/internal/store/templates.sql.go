@@ -12,12 +12,35 @@ import (
 )
 
 const getTemplateByName = `-- name: GetTemplateByName :one
-SELECT id, name, display_name, description, tags, owner_user_id, current_version_id, created_at, updated_at, owning_team_id FROM templates WHERE name = $1
+SELECT t.id, t.name, t.display_name, t.description, t.tags,
+       t.owner_user_id, t.current_version_id, t.created_at, t.updated_at,
+       t.owning_team_id,
+       tv.version AS current_version,
+       team.name  AS owning_team_name
+  FROM templates t
+  LEFT JOIN template_versions tv ON tv.id = t.current_version_id
+  LEFT JOIN teams team            ON team.id = t.owning_team_id
+ WHERE t.name = $1
 `
 
-func (q *Queries) GetTemplateByName(ctx context.Context, name string) (Template, error) {
+type GetTemplateByNameRow struct {
+	ID               pgtype.UUID        `json:"id"`
+	Name             string             `json:"name"`
+	DisplayName      string             `json:"display_name"`
+	Description      pgtype.Text        `json:"description"`
+	Tags             []string           `json:"tags"`
+	OwnerUserID      pgtype.UUID        `json:"owner_user_id"`
+	CurrentVersionID pgtype.UUID        `json:"current_version_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	OwningTeamID     pgtype.UUID        `json:"owning_team_id"`
+	CurrentVersion   pgtype.Int4        `json:"current_version"`
+	OwningTeamName   pgtype.Text        `json:"owning_team_name"`
+}
+
+func (q *Queries) GetTemplateByName(ctx context.Context, name string) (GetTemplateByNameRow, error) {
 	row := q.db.QueryRow(ctx, getTemplateByName, name)
-	var i Template
+	var i GetTemplateByNameRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -29,6 +52,8 @@ func (q *Queries) GetTemplateByName(ctx context.Context, name string) (Template,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.OwningTeamID,
+		&i.CurrentVersion,
+		&i.OwningTeamName,
 	)
 	return i, err
 }
