@@ -122,8 +122,8 @@ function UIModeNew() {
     setErr(null);
     setSaving(true);
     try {
-      // TODO(v1.1): MetaRow does not expose a display_name input yet.
-      // Fall back to the slug so the backend's required field is satisfied.
+      // display_name is optional in MetaRow; fall back to the slug so the
+      // backend's required field is satisfied when the admin leaves it blank.
       const displayName = meta.display_name?.trim() || meta.name;
       const res = await fetch("/api/v1/templates", {
         method: "POST",

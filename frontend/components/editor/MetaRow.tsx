@@ -34,9 +34,20 @@ export function MetaRow({ meta, onChange, nameLocked, readOnly }: Props) {
         <span className="text-slate-600">이름</span>
         <Input
           className="w-48 text-sm"
+          placeholder="템플릿 이름 (slug)"
           value={meta.name}
           disabled={nameLocked || lockAll}
           onChange={(e) => onChange({ ...meta, name: e.target.value })}
+        />
+      </label>
+      <label className="flex items-center gap-2 text-xs">
+        <span className="text-slate-600">표시 이름</span>
+        <Input
+          className="w-48 text-sm"
+          placeholder="표시 이름"
+          value={meta.display_name ?? ""}
+          disabled={lockAll}
+          onChange={(e) => onChange({ ...meta, display_name: e.target.value })}
         />
       </label>
       <label className="flex items-center gap-2 text-xs">
