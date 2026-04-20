@@ -64,6 +64,15 @@ func TestUpdateTemplate_EmptyDisplayNameRejected(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+func TestUpdateTemplate_WhitespaceDisplayNameRejected(t *testing.T) {
+	r := newTestRouterAdmin(t)
+	name := seedGlobalTemplate(t, r)
+
+	w := do(t, r, http.MethodPatch, "/v1/templates/"+name,
+		bytes.NewReader([]byte(`{"display_name":"   "}`)))
+	require.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestUpdateTemplate_NotFound(t *testing.T) {
 	r := newTestRouterAdmin(t)
 	body := `{"display_name":"x"}`

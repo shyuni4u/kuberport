@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -45,7 +46,9 @@ func (h *Handlers) UpdateTemplate(c *gin.Context) {
 	ctx := c.Request.Context()
 	params := store.UpdateTemplateMetaParams{Name: name}
 	if r.DisplayName != nil {
-		if *r.DisplayName == "" {
+		// Reject whitespace-only names too; stored value preserves the caller's
+		// original spacing so intentional leading/trailing characters survive.
+		if strings.TrimSpace(*r.DisplayName) == "" {
 			writeError(c, http.StatusBadRequest, "validation-error", "display_name cannot be empty")
 			return
 		}
@@ -63,7 +66,7 @@ func (h *Handlers) UpdateTemplate(c *gin.Context) {
 			writeError(c, http.StatusNotFound, "not-found", "template "+name)
 			return
 		}
-		log.Printf("UpdateTemplate: %v", err)
+		log.Printf("UpdateTemplate %s: %v", name, err)
 		writeError(c, http.StatusInternalServerError, "internal", "failed to update template")
 		return
 	}
@@ -79,7 +82,7 @@ func (h *Handlers) UpdateTemplate(c *gin.Context) {
 			writeError(c, http.StatusNotFound, "not-found", "template "+name)
 			return
 		}
-		log.Printf("UpdateTemplate GetTemplateByName: %v", err)
+		log.Printf("UpdateTemplate GetTemplateByName %s: %v", name, err)
 		writeError(c, http.StatusInternalServerError, "internal", "failed to reload template")
 		return
 	}
