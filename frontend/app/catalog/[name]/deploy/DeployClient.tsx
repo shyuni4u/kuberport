@@ -9,6 +9,13 @@ import { DynamicForm } from "@/components/DynamicForm";
 import { RBACCheckPanel } from "@/components/RBACCheckPanel";
 import { ResourcesPreview } from "@/components/ResourcesPreview";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { UISpec } from "@/lib/ui-spec-to-zod";
 
 type Props = {
@@ -38,26 +45,50 @@ export function DeployClient({
     cluster: "",
     namespace: "default",
   });
+  const [clusters, setClusters] = useState<string[]>([]);
   const [rendered, setRendered] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Hydrate cluster from localStorage on mount. Skipped for update flows:
-  // cluster is immutable on PUT (backend ignores it) and the meta inputs
-  // aren't rendered in update mode, so there's nothing to prefill.
-  // The setState-in-effect rule is correctly appeased here: localStorage
-  // is an external system we're reading once on mount, not derivable from
-  // props/state. There's no cascading-render risk because this only fires
-  // on the initial render.
+  // Load cluster list and hydrate meta.cluster on mount. Skipped for update
+  // flows: cluster is immutable on PUT (backend ignores it) and the meta
+  // inputs aren't rendered in update mode.
+  //
+  // The setState-in-effect rule is correctly appeased here: we're reading
+  // from localStorage + the network once on mount, not deriving from
+  // props/state. The fetch fires only once per mount.
   useEffect(() => {
     if (isUpdate) return;
-    const cached =
-      typeof window !== "undefined"
-        ? localStorage.getItem("kbp_cluster")
-        : null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (cached) setMeta((m) => ({ ...m, cluster: cached }));
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/clusters");
+        if (!res.ok) return;
+        const body = (await res.json()) as { clusters: Array<{ name: string }> };
+        const names = body.clusters.map((c) => c.name);
+        if (cancelled) return;
+        setClusters(names);
+
+        const cached =
+          typeof window !== "undefined"
+            ? localStorage.getItem("kbp_cluster")
+            : null;
+        // Prefer the cached cluster if it's still in the list; otherwise
+        // default to the first available cluster so the form is usable
+        // without an extra click.
+        const preselect =
+          cached && names.includes(cached) ? cached : (names[0] ?? "");
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        if (preselect) setMeta((m) => ({ ...m, cluster: preselect }));
+      } catch {
+        // Network/parse failure: clusters stays []. The Select below
+        // renders an admin-contact placeholder and blocks submission.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [isUpdate]);
 
   // Debounced preview render. 300ms matches the ResourcesPreview ergonomics —
@@ -167,11 +198,36 @@ export function DeployClient({
               value={meta.name}
               onChange={(e) => setMeta({ ...meta, name: e.target.value })}
             />
-            <Input
-              placeholder="클러스터"
+            <Select
               value={meta.cluster}
-              onChange={(e) => setMeta({ ...meta, cluster: e.target.value })}
-            />
+              onValueChange={(v) => {
+                const next = v ?? "";
+                setMeta((m) => ({ ...m, cluster: next }));
+                if (
+                  next &&
+                  typeof window !== "undefined"
+                ) {
+                  localStorage.setItem("kbp_cluster", next);
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    clusters.length === 0
+                      ? "등록된 클러스터가 없습니다 — 관리자에게 요청하세요"
+                      : "클러스터 선택"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {clusters.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               placeholder="네임스페이스"
               className="col-span-2"
