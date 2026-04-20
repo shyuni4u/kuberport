@@ -22,9 +22,16 @@ type Props = {
    * editable would silently drop the user's changes on save.
    */
   readOnly?: boolean;
+  /**
+   * Hide the team text input. Use when the caller renders its own team
+   * picker (e.g. /templates/new uses a Select bound to owning_team_id) — a
+   * second free-text "팀" input here would be confusing and meta.team is
+   * not sent to the backend in those flows.
+   */
+  hideTeam?: boolean;
 };
 
-export function MetaRow({ meta, onChange, nameLocked, readOnly }: Props) {
+export function MetaRow({ meta, onChange, nameLocked, readOnly, hideTeam }: Props) {
   const [tagInput, setTagInput] = useState("");
   const lockAll = readOnly === true;
 
@@ -50,15 +57,17 @@ export function MetaRow({ meta, onChange, nameLocked, readOnly }: Props) {
           onChange={(e) => onChange({ ...meta, display_name: e.target.value })}
         />
       </label>
-      <label className="flex items-center gap-2 text-xs">
-        <span className="text-slate-600">팀</span>
-        <Input
-          className="w-32 text-sm"
-          value={meta.team ?? ""}
-          disabled={lockAll}
-          onChange={(e) => onChange({ ...meta, team: e.target.value })}
-        />
-      </label>
+      {!hideTeam && (
+        <label className="flex items-center gap-2 text-xs">
+          <span className="text-slate-600">팀</span>
+          <Input
+            className="w-32 text-sm"
+            value={meta.team ?? ""}
+            disabled={lockAll}
+            onChange={(e) => onChange({ ...meta, team: e.target.value })}
+          />
+        </label>
+      )}
       <div className="flex flex-wrap items-center gap-1">
         {meta.tags.map((t) => (
           <Badge key={t} variant="secondary" className="text-[10px]">

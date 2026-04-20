@@ -133,7 +133,7 @@ function UIModeNew() {
           display_name: displayName,
           tags: meta.tags,
           authoring_mode: "ui",
-          owning_team_id: owningTeamId,
+          owning_team_id: owningTeamId || undefined,
           ui_state: uiState,
         }),
       });
@@ -201,7 +201,7 @@ function UIModeNew() {
 
   return (
     <div className="space-y-3">
-      <MetaRow meta={meta} onChange={setMeta} />
+      <MetaRow meta={meta} onChange={setMeta} hideTeam />
       <div className="flex items-center gap-2 text-xs">
         <span className="text-slate-600">소유 팀</span>
         <Select
@@ -301,7 +301,7 @@ function YamlModeNew() {
           display_name: displayName,
           tags: meta.tags,
           authoring_mode: "yaml",
-          owning_team_id: owningTeamId,
+          owning_team_id: owningTeamId || undefined,
           resources_yaml: resourcesYaml,
           ui_spec_yaml: uispecYaml,
         }),
@@ -316,7 +316,7 @@ function YamlModeNew() {
 
   return (
     <div className="space-y-3">
-      <MetaRow meta={meta} onChange={setMeta} />
+      <MetaRow meta={meta} onChange={setMeta} hideTeam />
       <div className="flex items-center gap-2 text-xs">
         <span className="text-slate-600">소유 팀</span>
         <Select
