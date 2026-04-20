@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -36,7 +37,7 @@ type GetReleaseByIDRow struct {
 	TemplateVersionID pgtype.UUID        `json:"template_version_id"`
 	ClusterID         pgtype.UUID        `json:"cluster_id"`
 	Namespace         string             `json:"namespace"`
-	ValuesJson        []byte             `json:"values_json"`
+	ValuesJson        json.RawMessage    `json:"values_json"`
 	RenderedYaml      string             `json:"rendered_yaml"`
 	CreatedByUserID   pgtype.UUID        `json:"created_by_user_id"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
@@ -79,13 +80,13 @@ VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, template_version_id, clu
 `
 
 type InsertReleaseParams struct {
-	Name              string      `json:"name"`
-	TemplateVersionID pgtype.UUID `json:"template_version_id"`
-	ClusterID         pgtype.UUID `json:"cluster_id"`
-	Namespace         string      `json:"namespace"`
-	ValuesJson        []byte      `json:"values_json"`
-	RenderedYaml      string      `json:"rendered_yaml"`
-	CreatedByUserID   pgtype.UUID `json:"created_by_user_id"`
+	Name              string          `json:"name"`
+	TemplateVersionID pgtype.UUID     `json:"template_version_id"`
+	ClusterID         pgtype.UUID     `json:"cluster_id"`
+	Namespace         string          `json:"namespace"`
+	ValuesJson        json.RawMessage `json:"values_json"`
+	RenderedYaml      string          `json:"rendered_yaml"`
+	CreatedByUserID   pgtype.UUID     `json:"created_by_user_id"`
 }
 
 func (q *Queries) InsertRelease(ctx context.Context, arg InsertReleaseParams) (Release, error) {
@@ -252,10 +253,10 @@ UPDATE releases
 `
 
 type UpdateReleaseValuesAndVersionParams struct {
-	ID                pgtype.UUID `json:"id"`
-	TemplateVersionID pgtype.UUID `json:"template_version_id"`
-	ValuesJson        []byte      `json:"values_json"`
-	RenderedYaml      string      `json:"rendered_yaml"`
+	ID                pgtype.UUID     `json:"id"`
+	TemplateVersionID pgtype.UUID     `json:"template_version_id"`
+	ValuesJson        json.RawMessage `json:"values_json"`
+	RenderedYaml      string          `json:"rendered_yaml"`
 }
 
 func (q *Queries) UpdateReleaseValuesAndVersion(ctx context.Context, arg UpdateReleaseValuesAndVersionParams) error {

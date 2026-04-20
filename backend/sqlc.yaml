@@ -14,3 +14,11 @@ sql:
         sql_package: pgx/v5
         emit_json_tags: true
         emit_interface: true
+        overrides:
+          # jsonb column — default []byte serializes as base64 in REST
+          # responses. RawMessage inlines the JSON instead.
+          - column: releases.values_json
+            go_type:
+              import: encoding/json
+              type: RawMessage
+          # ui_state_json is only written/read internally; keep []byte for now.

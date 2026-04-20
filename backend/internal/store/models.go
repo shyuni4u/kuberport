@@ -5,6 +5,8 @@
 package store
 
 import (
+	"encoding/json"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -26,7 +28,7 @@ type Release struct {
 	TemplateVersionID pgtype.UUID        `json:"template_version_id"`
 	ClusterID         pgtype.UUID        `json:"cluster_id"`
 	Namespace         string             `json:"namespace"`
-	ValuesJson        []byte             `json:"values_json"`
+	ValuesJson        json.RawMessage    `json:"values_json"`
 	RenderedYaml      string             `json:"rendered_yaml"`
 	CreatedByUserID   pgtype.UUID        `json:"created_by_user_id"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`

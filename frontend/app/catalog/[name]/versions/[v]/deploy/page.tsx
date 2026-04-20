@@ -11,43 +11,6 @@ import type { UISpec } from "@/lib/ui-spec-to-zod";
 // (`?updateReleaseId=<uuid>`). When `updateReleaseId` is present we fetch the
 // release's `values_json` and hand it to DeployClient as `initialValues` so
 // the form starts populated with the existing release's values.
-//
-// Wire-format note: GET /v1/releases/:id serializes `values_json` from a Go
-// `[]byte` (see backend/internal/store/releases.sql.go GetReleaseByIDRow).
-// `encoding/json` on `[]byte` emits a **base64-encoded string** of the raw
-// JSON bytes. We handle all three plausible shapes defensively:
-//   - plain object (already decoded by some future middleware)
-//   - plain JSON string (hand-serialized)
-//   - base64-encoded JSON string (current Go default)
-function parseValuesJson(raw: unknown): Record<string, unknown> | undefined {
-  if (raw && typeof raw === "object") {
-    return raw as Record<string, unknown>;
-  }
-  if (typeof raw !== "string" || raw.length === 0) return undefined;
-
-  // Try plain JSON first (cheap, and protects us if the backend ever changes
-  // to json.RawMessage).
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") {
-      return parsed as Record<string, unknown>;
-    }
-  } catch {
-    // fall through to base64
-  }
-
-  // Try base64 → UTF-8 JSON.
-  try {
-    const decoded = Buffer.from(raw, "base64").toString("utf8");
-    const parsed: unknown = JSON.parse(decoded);
-    if (parsed && typeof parsed === "object") {
-      return parsed as Record<string, unknown>;
-    }
-  } catch {
-    // swallow — caller gets undefined and the form renders empty
-  }
-  return undefined;
-}
 
 export default async function VersionPinnedDeployPage({
   params,
@@ -83,8 +46,10 @@ export default async function VersionPinnedDeployPage({
   if (updateReleaseId) {
     const relRes = await apiFetch(`/v1/releases/${updateReleaseId}`);
     if (relRes.ok) {
-      const rel = (await relRes.json()) as { values_json?: unknown };
-      initialValues = parseValuesJson(rel.values_json);
+      const rel = (await relRes.json()) as {
+        values_json?: Record<string, unknown>;
+      };
+      initialValues = rel.values_json;
     }
   }
 
