@@ -133,6 +133,34 @@ func TestUpdateTemplate_TeamViewerDenied(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, w.Code)
 }
 
+// Classic IDOR shape: editor of team A must not be able to edit a template
+// owned by team B, even though they're an editor somewhere. Mirrors
+// TestPermissions_CreateTemplate_OtherTeamDenied for the PATCH path.
+func TestUpdateTemplate_OtherTeamEditorDenied(t *testing.T) {
+	s := testStore(t)
+	adminR := api.NewRouter(config.Config{}, api.Deps{Verifier: adminVerifier{}, Store: s})
+
+	suffix := randSuffix()
+	email := "idor-" + suffix + "@example.com"
+	subject := "stub-idor-" + suffix
+	_, err := s.UpsertUser(context.Background(), store.UpsertUserParams{
+		OidcSubject: subject, Email: store.PgText(email), DisplayName: store.PgText("Idor"),
+	})
+	require.NoError(t, err)
+
+	teamA := createTeam(t, adminR, "team-a-"+randSuffix())
+	teamB := createTeam(t, adminR, "team-b-"+randSuffix())
+	addMember(t, adminR, teamA, email, "editor")
+	name := seedTemplateOwnedBy(t, adminR, teamB)
+
+	userR := api.NewRouter(config.Config{},
+		api.Deps{Verifier: customVerifier{claims: auth.Claims{Subject: subject, Email: email}}, Store: s})
+
+	w := do(t, userR, http.MethodPatch, "/v1/templates/"+name,
+		bytes.NewReader([]byte(`{"display_name":"hacked"}`)))
+	require.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+}
+
 func TestUpdateTemplate_ClearTagsWithEmptyArray(t *testing.T) {
 	r := newTestRouterAdmin(t)
 	name := seedGlobalTemplate(t, r) // starts with tags=["global"]

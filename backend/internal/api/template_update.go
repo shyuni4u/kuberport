@@ -72,6 +72,13 @@ func (h *Handlers) UpdateTemplate(c *gin.Context) {
 	// shape (current_version + owning_team_name) the clients expect.
 	updated, err := h.deps.Store.GetTemplateByName(ctx, name)
 	if err != nil {
+		// Concurrent delete between update + re-fetch: surface as 404 rather
+		// than 500 so the client can distinguish "someone else deleted it"
+		// from an actual server error.
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(c, http.StatusNotFound, "not-found", "template "+name)
+			return
+		}
 		log.Printf("UpdateTemplate GetTemplateByName: %v", err)
 		writeError(c, http.StatusInternalServerError, "internal", "failed to reload template")
 		return

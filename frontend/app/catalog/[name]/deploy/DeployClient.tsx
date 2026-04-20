@@ -236,10 +236,20 @@ export function DeployClient({
             />
           </div>
         )}
+        {!isUpdate && clusters.length === 0 && (
+          <div
+            role="status"
+            className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          >
+            등록된 클러스터가 없어 배포할 수 없습니다. 관리자에게 클러스터 등록을
+            요청하세요.
+          </div>
+        )}
         <DynamicForm
           spec={spec}
           initialValues={initialValues}
           submitLabel={isUpdate ? `v${version} 로 업데이트` : "배포하기"}
+          disabled={!isUpdate && !meta.cluster}
           onChange={preview}
           onSubmit={submit}
         />

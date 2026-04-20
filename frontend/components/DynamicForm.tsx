@@ -48,6 +48,7 @@ type Props = {
   spec: UISpec;
   initialValues?: Record<string, unknown>;
   submitLabel?: string;
+  disabled?: boolean;
   onSubmit: (values: Record<string, unknown>) => void;
   onChange?: (values: Record<string, unknown>) => void;
 };
@@ -92,6 +93,7 @@ export function DynamicForm({
   spec,
   initialValues,
   submitLabel = "배포하기",
+  disabled = false,
   onSubmit,
   onChange,
 }: Props) {
@@ -150,7 +152,9 @@ export function DynamicForm({
           <FieldRow key={field.path} field={field} control={form.control} />
         ))}
         <div className="flex justify-end">
-          <Button type="submit">{submitLabel}</Button>
+          <Button type="submit" disabled={disabled}>
+            {submitLabel}
+          </Button>
         </div>
       </form>
     </Form>
