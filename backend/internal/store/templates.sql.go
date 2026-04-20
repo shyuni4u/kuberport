@@ -476,3 +476,43 @@ func (q *Queries) UpdateTemplateCurrentVersion(ctx context.Context, arg UpdateTe
 	_, err := q.db.Exec(ctx, updateTemplateCurrentVersion, arg.ID, arg.CurrentVersionID)
 	return err
 }
+
+const updateTemplateMeta = `-- name: UpdateTemplateMeta :one
+UPDATE templates
+   SET display_name = COALESCE($1, display_name),
+       description  = COALESCE($2, description),
+       tags         = COALESCE($3, tags),
+       updated_at   = now()
+ WHERE name = $4
+ RETURNING id, name, display_name, description, tags, owner_user_id, current_version_id, created_at, updated_at, owning_team_id
+`
+
+type UpdateTemplateMetaParams struct {
+	DisplayName pgtype.Text `json:"display_name"`
+	Description pgtype.Text `json:"description"`
+	Tags        []string    `json:"tags"`
+	Name        string      `json:"name"`
+}
+
+func (q *Queries) UpdateTemplateMeta(ctx context.Context, arg UpdateTemplateMetaParams) (Template, error) {
+	row := q.db.QueryRow(ctx, updateTemplateMeta,
+		arg.DisplayName,
+		arg.Description,
+		arg.Tags,
+		arg.Name,
+	)
+	var i Template
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.DisplayName,
+		&i.Description,
+		&i.Tags,
+		&i.OwnerUserID,
+		&i.CurrentVersionID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OwningTeamID,
+	)
+	return i, err
+}

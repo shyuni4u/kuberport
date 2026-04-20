@@ -51,6 +51,7 @@ type Querier interface {
 	UpdateReleaseValuesAndVersion(ctx context.Context, arg UpdateReleaseValuesAndVersionParams) error
 	UpdateSessionTokens(ctx context.Context, arg UpdateSessionTokensParams) error
 	UpdateTemplateCurrentVersion(ctx context.Context, arg UpdateTemplateCurrentVersionParams) error
+	UpdateTemplateMeta(ctx context.Context, arg UpdateTemplateMetaParams) (Template, error)
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }
 

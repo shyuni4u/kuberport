@@ -25,6 +25,15 @@ VALUES ($1, $2, $3, $4, $5) RETURNING *;
 -- name: UpdateTemplateCurrentVersion :exec
 UPDATE templates SET current_version_id = $2, updated_at = now() WHERE id = $1;
 
+-- name: UpdateTemplateMeta :one
+UPDATE templates
+   SET display_name = COALESCE(sqlc.narg('display_name'), display_name),
+       description  = COALESCE(sqlc.narg('description'), description),
+       tags         = COALESCE(sqlc.narg('tags'), tags),
+       updated_at   = now()
+ WHERE name = sqlc.arg('name')
+ RETURNING *;
+
 -- name: NextTemplateVersion :one
 SELECT COALESCE(MAX(version), 0) + 1 FROM template_versions WHERE template_id = $1;
 
