@@ -5,7 +5,7 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 
 ## 현재 단계
 
-**프론트엔드 재설계 진행 중 — Plan 0·1·2·3·4 머지 완료, Plan 5 PR 리뷰 대기**.
+**프론트엔드 재설계 완료 — Plan 0~5 전부 머지 완료**. 다음 단계 (e2e 확장 / Helm chart 상세 / CRD 등) 는 미정.
 
 스펙: [docs/superpowers/specs/2026-04-19-frontend-design-spec.md](docs/superpowers/specs/2026-04-19-frontend-design-spec.md) (4 화면: Admin UI 에디터 / 카탈로그 / 배포 폼 / 릴리스 상세)
 
@@ -18,7 +18,7 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 | 2 | [release-detail-redesign](docs/superpowers/plans/2026-04-19-release-detail-redesign.md) | ✅ merged (PR #18) | 중첩 라우트 + 개요·로그 탭 + **SSE 백엔드 추가** + k8s 용어 토글. UpdateAvailableBadge 는 Plan 3 으로 이월 (`current_version` 정수 필드·`?updateReleaseId=` 라우트 의존). |
 | 3 | [deploy-form-redesign](docs/superpowers/plans/2026-04-19-deploy-form-redesign.md) | ✅ merged (PR #19) | **백엔드 3개 엔드포인트** (render/PUT releases/SSAR) + shadcn DynamicForm + RBAC 패널 + 업데이트 플로우 |
 | 4 | [admin-editor-redesign](docs/superpowers/plans/2026-04-19-admin-editor-redesign.md) | ✅ merged (PR #20) | ResizablePanelGroup + MetaRow + BottomBar + SchemaTree 배지 + FieldInspector enum values + ?mode=ui\|yaml 분기 |
-| 5 | [backend-meta-normalization](docs/superpowers/plans/2026-04-19-backend-meta-normalization.md) | 🟡 PR 리뷰 대기 | **MVP 전 필수 정리** — `/v1/templates/:name` JOIN 확장, `values_json` RawMessage, `PATCH /v1/templates/:name` 신설, 배포 폼 클러스터 드롭다운. Plan 3·4 구현 중 발견된 백엔드 구멍들. |
+| 5 | [backend-meta-normalization](docs/superpowers/plans/2026-04-19-backend-meta-normalization.md) | ✅ merged (PR #21) | **MVP 전 필수 정리** — `/v1/templates/:name` JOIN 확장, `values_json` RawMessage, `PATCH /v1/templates/:name` 신설, 배포 폼 클러스터 드롭다운. Plan 3·4 구현 중 발견된 백엔드 구멍들. |
 
 참고 — 초기 디자인: [2026-04-16-initial-design.md](docs/superpowers/specs/2026-04-16-initial-design.md), Plan 2 Admin UX: [2026-04-18-plan2-admin-ux-design.md](docs/superpowers/specs/2026-04-18-plan2-admin-ux-design.md).
 
