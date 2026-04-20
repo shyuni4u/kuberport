@@ -59,6 +59,42 @@ export function FieldInspector({
             onChange={x => onChange({ ...value, uiSpec: { ...value.uiSpec, label: x } })}/>
           <Labeled label="기본값" v={String(value.uiSpec.default ?? "")}
             onChange={x => onChange({ ...value, uiSpec: { ...value.uiSpec, default: coerce(x, value.uiSpec.type) } })}/>
+          {value.uiSpec.type === "enum" && (
+            <div>
+              <label className="block text-xs mb-1">Values</label>
+              <div className="space-y-1">
+                {(value.uiSpec.values ?? []).map((v, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      className="border rounded px-2 py-1 flex-1"
+                      value={v}
+                      onChange={e => {
+                        const next = [...(value.uiSpec.values ?? [])];
+                        next[i] = e.target.value;
+                        onChange({ ...value, uiSpec: { ...value.uiSpec, values: next } });
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="text-xs text-red-600 px-2"
+                      onClick={() => {
+                        const next = (value.uiSpec.values ?? []).filter((_, j) => j !== i);
+                        onChange({ ...value, uiSpec: { ...value.uiSpec, values: next } });
+                      }}
+                    >삭제</button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 mt-1"
+                  onClick={() => {
+                    const next = [...(value.uiSpec.values ?? []), ""];
+                    onChange({ ...value, uiSpec: { ...value.uiSpec, values: next } });
+                  }}
+                >+ 값 추가</button>
+              </div>
+            </div>
+          )}
           {value.uiSpec.type === "integer" && (
             <>
               <Labeled label="min" v={String(value.uiSpec.min ?? "")}
