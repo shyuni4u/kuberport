@@ -8,7 +8,15 @@ SELECT t.id, t.name, t.display_name, t.description, t.tags, t.owner_user_id, t.c
  ORDER BY t.name;
 
 -- name: GetTemplateByName :one
-SELECT * FROM templates WHERE name = $1;
+SELECT t.id, t.name, t.display_name, t.description, t.tags,
+       t.owner_user_id, t.current_version_id, t.created_at, t.updated_at,
+       t.owning_team_id,
+       tv.version AS current_version,
+       team.name  AS owning_team_name
+  FROM templates t
+  LEFT JOIN template_versions tv ON tv.id = t.current_version_id
+  LEFT JOIN teams team            ON team.id = t.owning_team_id
+ WHERE t.name = $1;
 
 -- name: InsertTemplate :one
 INSERT INTO templates (name, display_name, description, tags, owner_user_id)
@@ -16,6 +24,15 @@ VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: UpdateTemplateCurrentVersion :exec
 UPDATE templates SET current_version_id = $2, updated_at = now() WHERE id = $1;
+
+-- name: UpdateTemplateMeta :one
+UPDATE templates
+   SET display_name = COALESCE(sqlc.narg('display_name'), display_name),
+       description  = COALESCE(sqlc.narg('description'), description),
+       tags         = COALESCE(sqlc.narg('tags'), tags),
+       updated_at   = now()
+ WHERE name = sqlc.arg('name')
+ RETURNING *;
 
 -- name: NextTemplateVersion :one
 SELECT COALESCE(MAX(version), 0) + 1 FROM template_versions WHERE template_id = $1;

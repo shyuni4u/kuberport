@@ -35,6 +35,12 @@ type TemplateMetaFromAPI = {
   tags?: string[] | null;
 };
 
+function tagsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 function UIModeEdit() {
   const { name, v } = useParams<{ name: string; v: string }>();
   const router = useRouter();
@@ -43,6 +49,8 @@ function UIModeEdit() {
   const [cluster, setCluster] = useState("");
   const [active, setActive] = useState<{ resIdx: number; path: string; node: SchemaNode } | null>(null);
   const [meta, setMeta] = useState<TemplateMeta>({ name: name ?? "", tags: [] });
+  // Snapshot of meta loaded from the server, used to detect what to PATCH on save.
+  const [initialMeta, setInitialMeta] = useState<TemplateMeta | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -64,11 +72,13 @@ function UIModeEdit() {
 
         if (tRes.ok) {
           const t = await tRes.json() as TemplateMetaFromAPI;
-          setMeta({
+          const loaded: TemplateMeta = {
             name: t.name,
             display_name: t.display_name,
             tags: t.tags ?? [],
-          });
+          };
+          setMeta(loaded);
+          setInitialMeta(loaded);
         }
 
         if (cRes.ok) {
@@ -114,11 +124,33 @@ function UIModeEdit() {
     if (!state) return;
     setSaving(true);
     try {
-      // Only the version payload is persisted: POST /v1/templates/:name/versions
-      // writes a new row into template_versions (ui_state_json, authoring_mode,
-      // etc.). Parent-template metadata (display_name, tags) lives on the
-      // `templates` row and has no update endpoint today, so MetaRow is rendered
-      // read-only above — there is nothing to send here for those fields.
+      // 1) PATCH parent-template metadata first (only if the user changed it).
+      //    Doing this before the version POST means the metadata change is
+      //    durable even if the version write fails, and a failing PATCH
+      //    aborts the save so the user sees the error instead of the version
+      //    landing with stale meta.
+      const patchBody: Record<string, unknown> = {};
+      if (initialMeta) {
+        if ((meta.display_name ?? "") !== (initialMeta.display_name ?? "")) {
+          patchBody.display_name = meta.display_name ?? "";
+        }
+        if (!tagsEqual(meta.tags, initialMeta.tags)) {
+          patchBody.tags = meta.tags;
+        }
+      }
+      if (Object.keys(patchBody).length > 0) {
+        const patchRes = await fetch(`/api/v1/templates/${name}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(patchBody),
+        });
+        if (!patchRes.ok) {
+          setErr(`메타 저장 실패 ${patchRes.status}: ${await patchRes.text()}`);
+          return;
+        }
+      }
+
+      // 2) POST a new version with the UI-mode state.
       const res = await fetch(`/api/v1/templates/${name}/versions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -187,7 +219,7 @@ function UIModeEdit() {
 
   return (
     <div className="space-y-3">
-      <MetaRow meta={meta} onChange={setMeta} nameLocked readOnly />
+      <MetaRow meta={meta} onChange={setMeta} nameLocked hideTeam />
       <EditorLayout tree={tree} inspector={inspector} preview={preview} />
       {err && <div className="text-red-600 text-sm mt-2">{err}</div>}
       <BottomBar
