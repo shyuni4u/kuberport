@@ -85,7 +85,7 @@ type TemplateVersion struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	PublishedAt     pgtype.Timestamptz `json:"published_at"`
 	AuthoringMode   string             `json:"authoring_mode"`
-	UiStateJson     []byte             `json:"ui_state_json"`
+	UiStateJson     json.RawMessage    `json:"ui_state_json"`
 }
 
 type User struct {

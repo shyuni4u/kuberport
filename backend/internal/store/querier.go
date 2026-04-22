@@ -13,6 +13,12 @@ import (
 type Querier interface {
 	CountTemplatesForTeam(ctx context.Context, owningTeamID pgtype.UUID) (int64, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	// Draft-only delete. The releases.template_version_id FK is ON DELETE RESTRICT,
+	// so deleting a non-draft version that any release references would fail at
+	// the DB level. We gate at the query level as a fast-path + clear error
+	// shape: returns zero rows when the version is not draft so the handler can
+	// return 409 instead of a generic DB error.
+	DeleteDraftTemplateVersion(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
 	DeleteRelease(ctx context.Context, id pgtype.UUID) error
 	DeleteSession(ctx context.Context, id pgtype.UUID) error
 	DeleteTeam(ctx context.Context, id pgtype.UUID) error
@@ -48,6 +54,13 @@ type Querier interface {
 	NextTemplateVersion(ctx context.Context, templateID pgtype.UUID) (int32, error)
 	PublishTemplateVersion(ctx context.Context, id pgtype.UUID) (TemplateVersion, error)
 	SetTemplateVersionStatus(ctx context.Context, arg SetTemplateVersionStatusParams) (TemplateVersion, error)
+	// Draft-only update. Published/deprecated versions are immutable so we gate on
+	// status = 'draft' in the WHERE clause. Callers distinguish "not found" from
+	// "not draft" by reading the version first; the UPDATE returns zero rows when
+	// the gate fails. Content columns are optional (sqlc.narg) so callers only
+	// send what changed. authoring_mode is intentionally not patchable — drafts
+	// keep the mode they were created with.
+	UpdateDraftTemplateVersion(ctx context.Context, arg UpdateDraftTemplateVersionParams) (TemplateVersion, error)
 	UpdateReleaseValuesAndVersion(ctx context.Context, arg UpdateReleaseValuesAndVersionParams) error
 	UpdateSessionTokens(ctx context.Context, arg UpdateSessionTokensParams) error
 	UpdateTemplateCurrentVersion(ctx context.Context, arg UpdateTemplateCurrentVersionParams) error

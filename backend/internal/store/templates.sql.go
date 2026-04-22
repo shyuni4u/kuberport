@@ -7,9 +7,27 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const deleteDraftTemplateVersion = `-- name: DeleteDraftTemplateVersion :one
+DELETE FROM template_versions
+ WHERE id = $1 AND status = 'draft'
+ RETURNING id
+`
+
+// Draft-only delete. The releases.template_version_id FK is ON DELETE RESTRICT,
+// so deleting a non-draft version that any release references would fail at
+// the DB level. We gate at the query level as a fast-path + clear error
+// shape: returns zero rows when the version is not draft so the handler can
+// return 409 instead of a generic DB error.
+func (q *Queries) DeleteDraftTemplateVersion(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, deleteDraftTemplateVersion, id)
+	err := row.Scan(&id)
+	return id, err
+}
 
 const getTemplateByName = `-- name: GetTemplateByName :one
 SELECT t.id, t.name, t.display_name, t.description, t.tags,
@@ -246,16 +264,16 @@ INSERT INTO template_versions (
 `
 
 type InsertTemplateVersionV2Params struct {
-	TemplateID      pgtype.UUID `json:"template_id"`
-	Version         int32       `json:"version"`
-	ResourcesYaml   string      `json:"resources_yaml"`
-	UiSpecYaml      string      `json:"ui_spec_yaml"`
-	MetadataYaml    pgtype.Text `json:"metadata_yaml"`
-	Status          string      `json:"status"`
-	Notes           pgtype.Text `json:"notes"`
-	CreatedByUserID pgtype.UUID `json:"created_by_user_id"`
-	AuthoringMode   string      `json:"authoring_mode"`
-	UiStateJson     []byte      `json:"ui_state_json"`
+	TemplateID      pgtype.UUID     `json:"template_id"`
+	Version         int32           `json:"version"`
+	ResourcesYaml   string          `json:"resources_yaml"`
+	UiSpecYaml      string          `json:"ui_spec_yaml"`
+	MetadataYaml    pgtype.Text     `json:"metadata_yaml"`
+	Status          string          `json:"status"`
+	Notes           pgtype.Text     `json:"notes"`
+	CreatedByUserID pgtype.UUID     `json:"created_by_user_id"`
+	AuthoringMode   string          `json:"authoring_mode"`
+	UiStateJson     json.RawMessage `json:"ui_state_json"`
 }
 
 func (q *Queries) InsertTemplateVersionV2(ctx context.Context, arg InsertTemplateVersionV2Params) (TemplateVersion, error) {
@@ -444,6 +462,60 @@ type SetTemplateVersionStatusParams struct {
 
 func (q *Queries) SetTemplateVersionStatus(ctx context.Context, arg SetTemplateVersionStatusParams) (TemplateVersion, error) {
 	row := q.db.QueryRow(ctx, setTemplateVersionStatus, arg.ID, arg.Status)
+	var i TemplateVersion
+	err := row.Scan(
+		&i.ID,
+		&i.TemplateID,
+		&i.Version,
+		&i.ResourcesYaml,
+		&i.UiSpecYaml,
+		&i.MetadataYaml,
+		&i.Status,
+		&i.Notes,
+		&i.CreatedByUserID,
+		&i.CreatedAt,
+		&i.PublishedAt,
+		&i.AuthoringMode,
+		&i.UiStateJson,
+	)
+	return i, err
+}
+
+const updateDraftTemplateVersion = `-- name: UpdateDraftTemplateVersion :one
+UPDATE template_versions
+   SET resources_yaml = COALESCE($1, resources_yaml),
+       ui_spec_yaml   = COALESCE($2,   ui_spec_yaml),
+       metadata_yaml  = COALESCE($3,  metadata_yaml),
+       notes          = COALESCE($4,          notes),
+       ui_state_json  = COALESCE($5,  ui_state_json)
+ WHERE id = $6 AND status = 'draft'
+ RETURNING id, template_id, version, resources_yaml, ui_spec_yaml, metadata_yaml, status, notes, created_by_user_id, created_at, published_at, authoring_mode, ui_state_json
+`
+
+type UpdateDraftTemplateVersionParams struct {
+	ResourcesYaml pgtype.Text     `json:"resources_yaml"`
+	UiSpecYaml    pgtype.Text     `json:"ui_spec_yaml"`
+	MetadataYaml  pgtype.Text     `json:"metadata_yaml"`
+	Notes         pgtype.Text     `json:"notes"`
+	UiStateJson   json.RawMessage `json:"ui_state_json"`
+	ID            pgtype.UUID     `json:"id"`
+}
+
+// Draft-only update. Published/deprecated versions are immutable so we gate on
+// status = 'draft' in the WHERE clause. Callers distinguish "not found" from
+// "not draft" by reading the version first; the UPDATE returns zero rows when
+// the gate fails. Content columns are optional (sqlc.narg) so callers only
+// send what changed. authoring_mode is intentionally not patchable — drafts
+// keep the mode they were created with.
+func (q *Queries) UpdateDraftTemplateVersion(ctx context.Context, arg UpdateDraftTemplateVersionParams) (TemplateVersion, error) {
+	row := q.db.QueryRow(ctx, updateDraftTemplateVersion,
+		arg.ResourcesYaml,
+		arg.UiSpecYaml,
+		arg.MetadataYaml,
+		arg.Notes,
+		arg.UiStateJson,
+		arg.ID,
+	)
 	var i TemplateVersion
 	err := row.Scan(
 		&i.ID,

@@ -10,7 +10,7 @@ export default async function TemplatesPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">템플릿</h1>
         <Link
-          href="/templates/new/edit"
+          href="/templates/new"
           className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm"
         >
           + 새 템플릿

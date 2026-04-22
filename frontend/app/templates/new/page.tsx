@@ -6,6 +6,7 @@ import { KindPicker, KindRef } from "@/components/KindPicker";
 import { SchemaTree } from "@/components/SchemaTree";
 import { FieldInspector, UIField } from "@/components/FieldInspector";
 import { YamlPreview, UIModeTemplate } from "@/components/YamlPreview";
+import { UserFormPreview } from "@/components/UserFormPreview";
 import { EditorLayout } from "@/components/editor/EditorLayout";
 import { MetaRow, TemplateMeta } from "@/components/editor/MetaRow";
 import { BottomBar } from "@/components/editor/BottomBar";
@@ -17,14 +18,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { findKindSchema, OpenAPISchemaDoc, SchemaNode } from "@/lib/openapi";
 
-type Team = { id: string; name: string };
+type Team = { id: string; name: string; display_name?: string };
 
 // Sentinel used by the team <Select>. shadcn's Select disallows value="" on
 // SelectItem (base-ui rejects empty strings), so the "global" option uses
 // this placeholder and is mapped back to "" when submitted.
 const GLOBAL_TEAM = "__global__";
+
+function renderTeamLabel(value: unknown, teams: Team[]): string {
+  if (!value || value === GLOBAL_TEAM) return "(글로벌 — admin 전용)";
+  const team = teams.find((t) => t.id === value);
+  return team?.display_name || team?.name || String(value);
+}
 
 interface EditedResource {
   gv: string;
@@ -44,12 +52,30 @@ export default function NewTemplatePage() {
 }
 
 function NewTemplatePageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const mode = searchParams.get("mode") ?? "ui";
-  if (mode === "yaml") {
-    return <YamlModeNew />;
+  const mode = searchParams.get("mode") === "yaml" ? "yaml" : "ui";
+
+  function switchMode(next: string) {
+    const params = new URLSearchParams(searchParams);
+    params.set("mode", next);
+    router.replace(`/templates/new?${params.toString()}`);
   }
-  return <UIModeNew />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">새 템플릿</h1>
+        <Tabs value={mode} onValueChange={switchMode}>
+          <TabsList>
+            <TabsTrigger value="ui">UI 모드</TabsTrigger>
+            <TabsTrigger value="yaml">YAML 모드</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+      {mode === "yaml" ? <YamlModeNew /> : <UIModeNew />}
+    </div>
+  );
 }
 
 function UIModeNew() {
@@ -75,7 +101,13 @@ function UIModeNew() {
         if (cRes.ok) {
           const d = await cRes.json() as { clusters: Array<{ name: string }> };
           setClusters(d.clusters);
-          if (d.clusters[0]) setCluster(d.clusters[0].name);
+          const remembered = typeof window !== "undefined"
+            ? window.sessionStorage.getItem("kbp:editor-cluster")
+            : null;
+          const pick = remembered && d.clusters.some((c) => c.name === remembered)
+            ? remembered
+            : d.clusters[0]?.name;
+          if (pick) setCluster(pick);
         }
         if (tRes.ok) {
           const d = await tRes.json() as { teams: Team[] };
@@ -150,7 +182,16 @@ function UIModeNew() {
     <div className="space-y-4">
       <div>
         <label className="block text-xs mb-1">스키마 클러스터</label>
-        <select value={cluster} onChange={e => setCluster(e.target.value)} className="border rounded px-2 py-1 w-full">
+        <select
+          value={cluster}
+          onChange={(e) => {
+            setCluster(e.target.value);
+            if (typeof window !== "undefined") {
+              window.sessionStorage.setItem("kbp:editor-cluster", e.target.value);
+            }
+          }}
+          className="border rounded px-2 py-1 w-full"
+        >
           {clusters.map(c => <option key={c.name}>{c.name}</option>)}
         </select>
       </div>
@@ -197,7 +238,18 @@ function UIModeNew() {
     <div className="text-slate-500 text-sm">왼쪽 트리에서 필드를 선택하세요.</div>
   );
 
-  const preview = <div className="p-3"><YamlPreview uiState={uiState} /></div>;
+  const preview = (
+    <div className="p-3">
+      <Tabs defaultValue="yaml">
+        <TabsList className="mb-2">
+          <TabsTrigger value="yaml">YAML</TabsTrigger>
+          <TabsTrigger value="form">사용자 폼</TabsTrigger>
+        </TabsList>
+        <TabsContent value="yaml"><YamlPreview uiState={uiState} /></TabsContent>
+        <TabsContent value="form"><UserFormPreview uiState={uiState} /></TabsContent>
+      </Tabs>
+    </div>
+  );
 
   return (
     <div className="space-y-3">
@@ -209,18 +261,23 @@ function UIModeNew() {
           onValueChange={(v) => setOwningTeamId(!v || v === GLOBAL_TEAM ? "" : v)}
         >
           <SelectTrigger className="w-64">
-            <SelectValue />
+            <SelectValue>{(v) => renderTeamLabel(v, teams)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={GLOBAL_TEAM}>(글로벌 — admin 전용)</SelectItem>
             {teams.map((t) => (
               <SelectItem key={t.id} value={t.id}>
-                {t.name}
+                {t.display_name || t.name}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
+      {resources.length === 0 && (
+        <div className="rounded border-2 border-dashed border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
+          <strong>시작하려면</strong> 아래 트리 패널에서 k8s 리소스 종류(Deployment, Service 등)를 선택해 추가하세요. 스키마가 로드되면 노출할 필드를 트리에서 고르고, 오른쪽 인스펙터에서 라벨·기본값을 편집할 수 있습니다.
+        </div>
+      )}
       <EditorLayout tree={tree} inspector={inspector} preview={preview} />
       {err && <div className="text-red-600 text-sm whitespace-pre">{err}</div>}
       <BottomBar
@@ -307,8 +364,7 @@ function YamlModeNew() {
         }),
       });
       if (!res.ok) { setErr(`${res.status}: ${await res.text()}`); return; }
-      const d = await res.json();
-      router.push(`/templates/${d.template.name}`);
+      router.push("/templates");
     } finally {
       setSaving(false);
     }
@@ -324,13 +380,13 @@ function YamlModeNew() {
           onValueChange={(v) => setOwningTeamId(!v || v === GLOBAL_TEAM ? "" : v)}
         >
           <SelectTrigger className="w-64">
-            <SelectValue />
+            <SelectValue>{(v) => renderTeamLabel(v, teams)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={GLOBAL_TEAM}>(글로벌 — admin 전용)</SelectItem>
             {teams.map((t) => (
               <SelectItem key={t.id} value={t.id}>
-                {t.name}
+                {t.display_name || t.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -340,6 +396,12 @@ function YamlModeNew() {
         <YamlEditor label="resources.yaml" value={resourcesYaml} onChange={setResourcesYaml} />
         <YamlEditor label="ui-spec.yaml" value={uispecYaml} onChange={setUispecYaml} />
       </div>
+      <details className="rounded border bg-white p-3" open>
+        <summary className="cursor-pointer text-sm font-semibold">사용자 폼 미리보기</summary>
+        <div className="mt-3">
+          <UserFormPreview uiSpecYaml={uispecYaml} />
+        </div>
+      </details>
       {err && <div className="text-red-600 text-sm whitespace-pre">{err}</div>}
       <BottomBar
         canSave={canSave}

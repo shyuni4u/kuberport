@@ -115,8 +115,19 @@ func (h *Handlers) proxyOpenAPI(c *gin.Context, gv string) {
 		return
 	}
 
+	// k8s serves OpenAPI v3 under two roots:
+	//   /openapi/v3/api/v1                 — core API (no group)
+	//   /openapi/v3/apis/<group>/<version> — named groups
+	// Empty gv is the index. A bare version ("v1") means core; anything
+	// containing "/" is a named group. Routing everything through /apis/
+	// was breaking core resources like Service and ConfigMap with 404.
 	upstreamPath := "/openapi/v3"
-	if gv != "" {
+	switch {
+	case gv == "":
+		// index
+	case !strings.Contains(gv, "/"):
+		upstreamPath = "/openapi/v3/api/" + gv
+	default:
 		upstreamPath = "/openapi/v3/apis/" + gv
 	}
 	up, err := url.Parse(cluster.ApiUrl)
