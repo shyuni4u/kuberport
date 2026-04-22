@@ -13,7 +13,7 @@ test:
 # Requires: docker compose up, a kind cluster with its API URL in KBP_KIND_API,
 # kubectl configured for the same cluster.
 e2e: compose-up
-	cd backend && atlas schema apply --env local --auto-approve
+	cd backend/migrations && atlas schema apply --env local --auto-approve
 	cd backend && go test -tags=e2e ./e2e/... -v
 
 # Browser-level Plan 2 regression suite. Requires the full local-e2e.md

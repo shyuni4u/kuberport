@@ -76,8 +76,8 @@ Full details: [docs/superpowers/specs/2026-04-16-initial-design.md](docs/superpo
 # 1. Boot local Postgres + dex (OIDC)
 docker compose -f deploy/docker/docker-compose.yml up -d
 
-# 2. Apply DB schema
-cd backend && atlas schema apply --env local --auto-approve
+# 2. Apply DB schema (atlas.hcl lives under backend/migrations)
+cd backend/migrations && atlas schema apply --env local --auto-approve && cd ..
 
 # 3. Run the Go API
 go run ./cmd/server
