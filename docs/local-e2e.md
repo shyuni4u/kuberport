@@ -218,6 +218,7 @@ curl -s -H "Authorization: Bearer $ADM" -H 'content-type: application/json' \
 {
   "name":"web",
   "display_name":"Web Service",
+  "authoring_mode":"yaml",
   "resources_yaml":"apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n        - name: app\n          image: nginx:1.25\n          ports:\n            - containerPort: 80\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: web\nspec:\n  selector: {app: web}\n  ports: [{port: 80, targetPort: 80}]\n",
   "ui_spec_yaml":"fields:\n  - path: Deployment[web].spec.replicas\n    label: 인스턴스 개수\n    type: integer\n    min: 1\n    max: 5\n    default: 2\n    required: true\n  - path: Deployment[web].spec.template.spec.containers[0].image\n    label: 컨테이너 이미지\n    type: string\n    default: nginx:1.25\n    required: true\n"
 }

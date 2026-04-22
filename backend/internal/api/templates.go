@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -385,6 +386,162 @@ func (h *Handlers) DeprecateVersion(c *gin.Context) {
 		return
 	}
 	h.setVersionStatus(c, "published", "deprecated")
+}
+
+// updateVersionReq mirrors createVersionReq but every content field is a
+// pointer — "not sent" means "don't touch", vs. an empty string which clears
+// the column. authoring_mode is intentionally not patchable (drafts keep
+// their original mode — see UpdateDraftTemplateVersion comment).
+type updateVersionReq struct {
+	ResourcesYAML *string                   `json:"resources_yaml"`
+	UISpecYAML    *string                   `json:"ui_spec_yaml"`
+	UIState       *template.UIModeTemplate  `json:"ui_state"`
+	MetadataYAML  *string                   `json:"metadata_yaml"`
+	Notes         *string                   `json:"notes"`
+}
+
+// UpdateTemplateVersion patches the content of a draft version in place.
+// Only drafts are patchable (published/deprecated are immutable). This is the
+// save target for both the UI-mode and YAML-mode editors when they're working
+// on an existing draft; creating a fresh draft from a published version still
+// goes through CreateTemplateVersion.
+func (h *Handlers) UpdateTemplateVersion(c *gin.Context) {
+	name := c.Param("name")
+	if _, ok := h.ensureTemplateEditor(c, name); !ok {
+		return
+	}
+	vnum, err := strconv.Atoi(c.Param("v"))
+	if err != nil {
+		writeError(c, http.StatusBadRequest, "validation-error", "v must be an integer")
+		return
+	}
+	tv, err := h.deps.Store.GetTemplateVersion(c, store.GetTemplateVersionParams{Name: name, Version: int32(vnum)})
+	if err != nil {
+		writeError(c, http.StatusNotFound, "not-found", "template version")
+		return
+	}
+	if tv.Status != "draft" {
+		writeError(c, http.StatusConflict, "conflict",
+			"version is "+tv.Status+"; only drafts can be updated")
+		return
+	}
+
+	var r updateVersionReq
+	if err := c.ShouldBindJSON(&r); err != nil {
+		writeError(c, http.StatusBadRequest, "validation-error", err.Error())
+		return
+	}
+
+	// Enforce authoring_mode / payload consistency — same rules as CreateTemplateVersion.
+	// UI-mode drafts take ui_state; YAML-mode drafts take resources_yaml + ui_spec_yaml.
+	// Sending the wrong payload shape is almost certainly a client bug, so reject loudly.
+	params := store.UpdateDraftTemplateVersionParams{ID: tv.ID}
+	switch tv.AuthoringMode {
+	case "ui":
+		if r.ResourcesYAML != nil || r.UISpecYAML != nil {
+			writeError(c, http.StatusBadRequest, "validation-error",
+				"authoring_mode=ui draft must not receive resources_yaml/ui_spec_yaml; send ui_state")
+			return
+		}
+		if r.UIState != nil {
+			res, spec, err := template.SerializeUIMode(*r.UIState)
+			if err != nil {
+				writeError(c, http.StatusBadRequest, "validation-error", err.Error())
+				return
+			}
+			params.ResourcesYaml = pgtype.Text{String: res, Valid: true}
+			params.UiSpecYaml = pgtype.Text{String: spec, Valid: true}
+			raw, err := json.Marshal(r.UIState)
+			if err != nil {
+				writeError(c, http.StatusInternalServerError, "internal", "serialize ui_state: "+err.Error())
+				return
+			}
+			params.UiStateJson = raw
+		}
+	case "yaml":
+		if r.UIState != nil {
+			writeError(c, http.StatusBadRequest, "validation-error",
+				"authoring_mode=yaml draft must not receive ui_state; send resources_yaml/ui_spec_yaml")
+			return
+		}
+		if r.ResourcesYAML != nil {
+			params.ResourcesYaml = pgtype.Text{String: *r.ResourcesYAML, Valid: true}
+		}
+		if r.UISpecYAML != nil {
+			params.UiSpecYaml = pgtype.Text{String: *r.UISpecYAML, Valid: true}
+		}
+	}
+	if r.MetadataYAML != nil {
+		params.MetadataYaml = pgtype.Text{String: *r.MetadataYAML, Valid: true}
+	}
+	if r.Notes != nil {
+		params.Notes = pgtype.Text{String: *r.Notes, Valid: true}
+	}
+
+	// Spec dry-run so we don't persist invalid YAML. Mirrors the same gate in
+	// CreateTemplateVersion; the in-place update makes the gate even more
+	// important because failure can't be "undone" by just not publishing.
+	finalRes := tv.ResourcesYaml
+	if params.ResourcesYaml.Valid {
+		finalRes = params.ResourcesYaml.String
+	}
+	finalSpec := tv.UiSpecYaml
+	if params.UiSpecYaml.Valid {
+		finalSpec = params.UiSpecYaml.String
+	}
+	if err := template.ValidateSpec(finalRes, finalSpec); err != nil {
+		writeError(c, http.StatusBadRequest, "validation-error", err.Error())
+		return
+	}
+
+	updated, err := h.deps.Store.UpdateDraftTemplateVersion(c, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Lost a status race — version flipped out of draft between GetTemplateVersion and UPDATE.
+			writeError(c, http.StatusConflict, "conflict", "version is no longer draft")
+			return
+		}
+		log.Printf("UpdateDraftTemplateVersion: %v", err)
+		writeError(c, http.StatusInternalServerError, "internal", "update failed")
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}
+
+// DeleteTemplateVersion removes a draft version. Published/deprecated versions
+// are immutable and protected by the releases → template_versions FK's ON
+// DELETE RESTRICT. We check the draft gate in the query so a stale UI that
+// tries to delete a just-published version gets 409 instead of a generic 500.
+func (h *Handlers) DeleteTemplateVersion(c *gin.Context) {
+	name := c.Param("name")
+	if _, ok := h.ensureTemplateEditor(c, name); !ok {
+		return
+	}
+	vnum, err := strconv.Atoi(c.Param("v"))
+	if err != nil {
+		writeError(c, http.StatusBadRequest, "validation-error", "v must be an integer")
+		return
+	}
+	tv, err := h.deps.Store.GetTemplateVersion(c, store.GetTemplateVersionParams{Name: name, Version: int32(vnum)})
+	if err != nil {
+		writeError(c, http.StatusNotFound, "not-found", "template version")
+		return
+	}
+	if tv.Status != "draft" {
+		writeError(c, http.StatusConflict, "conflict",
+			"version is "+tv.Status+"; only drafts can be deleted")
+		return
+	}
+	if _, err := h.deps.Store.DeleteDraftTemplateVersion(c, tv.ID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(c, http.StatusConflict, "conflict", "version is no longer draft")
+			return
+		}
+		log.Printf("DeleteDraftTemplateVersion: %v", err)
+		writeError(c, http.StatusInternalServerError, "internal", "delete failed")
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handlers) UndeprecateVersion(c *gin.Context) {

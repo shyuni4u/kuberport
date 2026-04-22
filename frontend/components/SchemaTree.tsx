@@ -70,7 +70,11 @@ function renderNode(
             <span className="text-slate-400 ml-2">{child.type ?? "?"}</span>
             {fieldMode && <FieldBadge mode={fieldMode} />}
           </span>
-          {isExp && renderNode(p, child, depth + 1, expanded, setExpanded, selectedPath, onSelect, fields)}
+          {isExp && (
+            <ul>
+              {renderNode(p, child, depth + 1, expanded, setExpanded, selectedPath, onSelect, fields)}
+            </ul>
+          )}
         </li>
       );
     });
@@ -96,7 +100,11 @@ function renderNode(
           <span className="text-slate-400 ml-2">{node.items.type ?? "?"}</span>
           {fieldMode && <FieldBadge mode={fieldMode} />}
         </span>
-        {isExp && renderNode(p, node.items, depth + 1, expanded, setExpanded, selectedPath, onSelect, fields)}
+        {isExp && (
+          <ul>
+            {renderNode(p, node.items, depth + 1, expanded, setExpanded, selectedPath, onSelect, fields)}
+          </ul>
+        )}
       </li>
     );
   }

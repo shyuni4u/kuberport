@@ -77,3 +77,29 @@ UPDATE template_versions
    SET status = $2, published_at = CASE WHEN $2 = 'published' AND published_at IS NULL THEN now() ELSE published_at END
  WHERE id = $1
  RETURNING *;
+
+-- Draft-only update. Published/deprecated versions are immutable so we gate on
+-- status = 'draft' in the WHERE clause. Callers distinguish "not found" from
+-- "not draft" by reading the version first; the UPDATE returns zero rows when
+-- the gate fails. Content columns are optional (sqlc.narg) so callers only
+-- send what changed. authoring_mode is intentionally not patchable — drafts
+-- keep the mode they were created with.
+-- name: UpdateDraftTemplateVersion :one
+UPDATE template_versions
+   SET resources_yaml = COALESCE(sqlc.narg('resources_yaml'), resources_yaml),
+       ui_spec_yaml   = COALESCE(sqlc.narg('ui_spec_yaml'),   ui_spec_yaml),
+       metadata_yaml  = COALESCE(sqlc.narg('metadata_yaml'),  metadata_yaml),
+       notes          = COALESCE(sqlc.narg('notes'),          notes),
+       ui_state_json  = COALESCE(sqlc.narg('ui_state_json'),  ui_state_json)
+ WHERE id = sqlc.arg('id') AND status = 'draft'
+ RETURNING *;
+
+-- Draft-only delete. The releases.template_version_id FK is ON DELETE RESTRICT,
+-- so deleting a non-draft version that any release references would fail at
+-- the DB level. We gate at the query level as a fast-path + clear error
+-- shape: returns zero rows when the version is not draft so the handler can
+-- return 409 instead of a generic DB error.
+-- name: DeleteDraftTemplateVersion :one
+DELETE FROM template_versions
+ WHERE id = $1 AND status = 'draft'
+ RETURNING id;
