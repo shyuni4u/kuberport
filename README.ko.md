@@ -76,8 +76,8 @@ Browser ── Next.js (k8s Pod, BFF) ── Go API (in k8s) ── Target k8s c
 # 1. 로컬 Postgres + dex (OIDC) 띄우기
 docker compose -f deploy/docker/docker-compose.yml up -d
 
-# 2. DB 스키마 적용
-cd backend && atlas schema apply --env local --auto-approve
+# 2. DB 스키마 적용 (atlas.hcl 은 backend/migrations 에 있음)
+cd backend/migrations && atlas schema apply --env local --auto-approve && cd ..
 
 # 3. Go API 실행
 go run ./cmd/server
