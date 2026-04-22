@@ -107,7 +107,15 @@ export function yamlToUIState(resourcesYaml: string, uiSpecYaml: string): YamlTo
     for (const [k, v] of Object.entries(value)) {
       if (k === "apiVersion" || k === "kind") continue;
       if (k === "metadata") {
-        for (const [mk, mv] of Object.entries((v as Record<string, unknown>) ?? {})) {
+        // Guard: malformed YAML could have a scalar / array `metadata`. Plain
+        // `Object.entries(nonObject)` either returns `[]` silently or walks
+        // stringified characters, so we'd emit nonsense paths like
+        // `metadata.0`. Require an actual object before iterating.
+        if (!v || typeof v !== "object" || Array.isArray(v)) {
+          warnings.push(`resource ${kind}[${name}] metadata is not an object; skipped`);
+          continue;
+        }
+        for (const [mk, mv] of Object.entries(v as Record<string, unknown>)) {
           if (mk === "name") continue;
           walkScalars(mv, `metadata.${mk}`, fields, warnings);
         }
