@@ -387,6 +387,7 @@ function YamlModeEdit() {
   const [resourcesYaml, setResourcesYaml] = useState("");
   const [uispecYaml, setUispecYaml] = useState("");
   const [status, setStatus] = useState<string>("");
+  const [sourceAuthoringMode, setSourceAuthoringMode] = useState<string>("");
   const [err, setErr] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -395,16 +396,21 @@ function YamlModeEdit() {
     (async () => {
       const res = await fetch(`/api/v1/templates/${name}/versions/${v}`);
       if (!res.ok) { setErr(await res.text()); return; }
-      const ver = await res.json() as { resources_yaml?: string; ui_spec_yaml?: string; status?: string };
+      const ver = await res.json() as { resources_yaml?: string; ui_spec_yaml?: string; status?: string; authoring_mode?: string };
       setResourcesYaml(ver.resources_yaml ?? "");
       setUispecYaml(ver.ui_spec_yaml ?? "");
       setStatus(ver.status ?? "");
+      setSourceAuthoringMode(ver.authoring_mode ?? "");
       setLoaded(true);
     })();
   }, [name, v]);
 
   const isDraft = status === "draft";
-  const canSave = loaded && !saving;
+  // UI-authored drafts can't be PATCHed with yaml payloads — the backend
+  // rejects the shape and blocks authoring_mode flips on drafts anyway. Gate
+  // save to preview-only in that case, mirroring UIModeEdit's isYamlDraft.
+  const isUiDraft = isDraft && sourceAuthoringMode === "ui";
+  const canSave = loaded && !saving && !isUiDraft;
 
   async function save() {
     setErr(null);
@@ -438,6 +444,11 @@ function YamlModeEdit() {
 
   return (
     <div className="space-y-3">
+      {isUiDraft && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          이 draft 는 UI 모드로 작성되었습니다. YAML 탭에서는 미리보기만 가능합니다 — 편집하려면 UI 탭으로 전환하세요.
+        </div>
+      )}
       {!isDraft && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           v{v}은 {status} 상태입니다. 저장하면 새 draft 버전으로 저장됩니다.
