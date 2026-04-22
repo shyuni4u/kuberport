@@ -5,7 +5,7 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 
 ## 현재 단계
 
-**프론트엔드 재설계 완료 — Plan 0~5 전부 머지 완료**. 다음 단계 (e2e 확장 / Helm chart 상세 / CRD 등) 는 미정.
+**Plan 0~6 머지 완료**. 다음 단계로 Plan 7 (비주얼 리프레시, Figma 레퍼런스 `nDP3cHNKf5Cjo6F2HU1EVv` 참조) 초안 작성 — 구현은 별도 진행. 그 후 방향(e2e 확장 / Helm chart 상세 / CRD 등) 은 미정.
 
 스펙: [docs/superpowers/specs/2026-04-19-frontend-design-spec.md](docs/superpowers/specs/2026-04-19-frontend-design-spec.md) (4 화면: Admin UI 에디터 / 카탈로그 / 배포 폼 / 릴리스 상세)
 
@@ -19,7 +19,8 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 | 3 | [deploy-form-redesign](docs/superpowers/plans/2026-04-19-deploy-form-redesign.md) | ✅ merged (PR #19) | **백엔드 3개 엔드포인트** (render/PUT releases/SSAR) + shadcn DynamicForm + RBAC 패널 + 업데이트 플로우 |
 | 4 | [admin-editor-redesign](docs/superpowers/plans/2026-04-19-admin-editor-redesign.md) | ✅ merged (PR #20) | ResizablePanelGroup + MetaRow + BottomBar + SchemaTree 배지 + FieldInspector enum values + ?mode=ui\|yaml 분기 |
 | 5 | [backend-meta-normalization](docs/superpowers/plans/2026-04-19-backend-meta-normalization.md) | ✅ merged (PR #21) | **MVP 전 필수 정리** — `/v1/templates/:name` JOIN 확장, `values_json` RawMessage, `PATCH /v1/templates/:name` 신설, 배포 폼 클러스터 드롭다운. Plan 3·4 구현 중 발견된 백엔드 구멍들. |
-| 6 | [post-mvp-stabilization](docs/superpowers/plans/2026-04-22-post-mvp-stabilization.md) | 🟡 PR #27, 리뷰 대기 | 첫 실제 브라우저 테스트에서 발견된 버그·UX 갭 정리 — 레거시 `/templates/[name]/edit` 제거, 상세 페이지 permission-aware UI + `+ 새 버전`·`삭제`, `/templates/new` + version-edit 모드 탭, yaml→UI 변환 + 사용자 폼 preview, 릴리스 리스트 `상태` 컬럼 제거. **백엔드 추가**: `PATCH`/`DELETE /v1/templates/:name/versions/:v` (drafts-only), core-API openapi 경로 수정, `ui_state_json` RawMessage, `TestMain` cleanup. |
+| 6 | [post-mvp-stabilization](docs/superpowers/plans/2026-04-22-post-mvp-stabilization.md) | ✅ merged (PR #27) | 첫 실제 브라우저 테스트에서 발견된 버그·UX 갭 정리 — 레거시 `/templates/[name]/edit` 제거, 상세 페이지 permission-aware UI + `+ 새 버전`·`삭제`, `/templates/new` + version-edit 모드 탭, yaml→UI 변환 + 사용자 폼 preview, 릴리스 리스트 `상태` 컬럼 제거. **백엔드 추가**: `PATCH`/`DELETE /v1/templates/:name/versions/:v` (drafts-only), core-API openapi 경로 수정, `ui_state_json` RawMessage, `TestMain` cleanup. |
+| 7 | [plan7-visual-refresh](docs/superpowers/plans/2026-04-22-plan7-visual-refresh.md) | 📝 초안 | **비주얼 리프레시 only — 기능·라우트·백엔드 변경 없음.** Figma 레퍼런스(`nDP3cHNKf5Cjo6F2HU1EVv`) 기반 디자인 토큰 재정의 + `AppShell`(좌측 사이드바 + 얇은 탑바) 도입 + `CatalogCard`/`ReleaseTable`/`RoleBadge`/`StatusChip`/`MetricCards` 비주얼 리프레시. |
 
 참고 — 초기 디자인: [2026-04-16-initial-design.md](docs/superpowers/specs/2026-04-16-initial-design.md), Plan 2 Admin UX: [2026-04-18-plan2-admin-ux-design.md](docs/superpowers/specs/2026-04-18-plan2-admin-ux-design.md).
 
