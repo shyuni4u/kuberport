@@ -11,35 +11,42 @@ interface ReleaseRow {
 export function ReleaseTable({ rows }: { rows: ReleaseRow[] }) {
   if (rows.length === 0) {
     return (
-      <div className="bg-white border rounded p-8 text-center text-sm text-slate-500">
+      <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
         아직 배포된 릴리스가 없습니다.
       </div>
     );
   }
   return (
-    <table className="w-full bg-white border rounded text-sm">
-      <thead className="text-xs text-slate-500">
-        <tr>
-          <th className="p-2 text-left">이름</th>
-          <th className="p-2 text-left">템플릿</th>
-          <th className="p-2 text-left">네임스페이스</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.id} className="border-t">
-            <td className="p-2">
-              <Link href={`/releases/${r.id}`} className="text-blue-600">
-                {r.name}
-              </Link>
-            </td>
-            <td className="p-2">
-              {r.template_name}@v{r.template_version}
-            </td>
-            <td className="p-2 font-mono text-xs">{r.namespace}</td>
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/40 text-xs text-muted-foreground">
+          <tr>
+            <th className="px-4 py-3 text-left font-medium">이름</th>
+            <th className="px-4 py-3 text-left font-medium">템플릿</th>
+            <th className="px-4 py-3 text-left font-medium">네임스페이스</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className="border-t border-border transition hover:bg-muted/30">
+              <td className="px-4 py-3">
+                <Link
+                  href={`/releases/${r.id}`}
+                  className="font-medium text-primary hover:underline"
+                >
+                  {r.name}
+                </Link>
+              </td>
+              <td className="px-4 py-3 text-muted-foreground">
+                {r.template_name}@v{r.template_version}
+              </td>
+              <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                {r.namespace}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
