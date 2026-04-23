@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 interface ReleaseRow {
   id: string;
@@ -9,10 +12,11 @@ interface ReleaseRow {
 }
 
 export function ReleaseTable({ rows }: { rows: ReleaseRow[] }) {
+  const t = useTranslations("releases.table");
   if (rows.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
-        아직 배포된 릴리스가 없습니다.
+        {t("empty")}
       </div>
     );
   }
@@ -21,9 +25,9 @@ export function ReleaseTable({ rows }: { rows: ReleaseRow[] }) {
       <table className="w-full text-sm">
         <thead className="bg-muted/40 text-xs text-muted-foreground">
           <tr>
-            <th className="px-4 py-3 text-left font-medium">이름</th>
-            <th className="px-4 py-3 text-left font-medium">템플릿</th>
-            <th className="px-4 py-3 text-left font-medium">네임스페이스</th>
+            <th className="px-4 py-3 text-left font-medium">{t("name")}</th>
+            <th className="px-4 py-3 text-left font-medium">{t("template")}</th>
+            <th className="px-4 py-3 text-left font-medium">{t("namespace")}</th>
           </tr>
         </thead>
         <tbody>

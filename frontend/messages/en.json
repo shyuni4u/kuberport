@@ -17,5 +17,23 @@
     "edit": "Edit",
     "loading": "Loading…",
     "empty": "No data."
+  },
+  "catalog": {
+    "title": "Catalog",
+    "searchPlaceholder": "Search templates…",
+    "emptyNoTemplates": "No templates have been published yet.",
+    "emptyNoMatch": "No templates match your search or tag filter.",
+    "card": {
+      "deploy": "Deploy →"
+    }
+  },
+  "releases": {
+    "myTitle": "My releases",
+    "table": {
+      "name": "Name",
+      "template": "Template",
+      "namespace": "Namespace",
+      "empty": "No releases yet."
+    }
   }
 }

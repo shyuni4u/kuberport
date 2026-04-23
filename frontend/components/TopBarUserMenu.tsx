@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +14,7 @@ import type { Role } from "@/lib/role";
 type Props = { email: string; role: Role };
 
 export function TopBarUserMenu({ email, role }: Props) {
+  const t = useTranslations("shell");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -32,7 +34,7 @@ export function TopBarUserMenu({ email, role }: Props) {
           render={
             <form action="/api/auth/logout" method="POST">
               <button type="submit" className="w-full text-left">
-                로그아웃
+                {t("logout")}
               </button>
             </form>
           }

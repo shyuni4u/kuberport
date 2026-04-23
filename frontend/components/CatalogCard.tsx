@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { iconFor } from "@/lib/template-icons";
 
@@ -14,6 +17,7 @@ export type CatalogCardTemplate = {
 type Props = { template: CatalogCardTemplate };
 
 export function CatalogCard({ template }: Props) {
+  const t = useTranslations("catalog.card");
   const Icon = iconFor(template.tags);
   const teamLabel = template.owning_team_name ?? "—";
   return (
@@ -42,7 +46,7 @@ export function CatalogCard({ template }: Props) {
           href={`/catalog/${template.name}/deploy`}
           className="font-medium text-primary hover:underline"
         >
-          배포하기 →
+          {t("deploy")}
         </Link>
       </div>
     </div>
