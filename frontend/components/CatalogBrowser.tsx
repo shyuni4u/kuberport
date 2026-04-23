@@ -30,7 +30,7 @@ export function CatalogBrowser({ templates }: Props) {
 
   if (templates.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 py-16 text-slate-500">
+      <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
         <p className="text-sm">관리자가 아직 템플릿을 만들지 않았습니다.</p>
       </div>
     );
@@ -59,7 +59,7 @@ export function CatalogBrowser({ templates }: Props) {
         </ToggleGroup>
       )}
       {filtered.length === 0 ? (
-        <div className="py-12 text-center text-sm text-slate-500">
+        <div className="py-12 text-center text-sm text-muted-foreground">
           일치하는 템플릿이 없습니다. 검색어나 태그 필터를 바꿔보세요.
         </div>
       ) : (

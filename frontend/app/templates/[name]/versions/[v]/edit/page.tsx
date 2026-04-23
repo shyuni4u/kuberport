@@ -277,7 +277,7 @@ function UIModeEdit() {
         const s = schemas[`${r.apiVersion}/${r.kind}`];
         return (
           <div key={i} className="border rounded p-2 mb-2">
-            <div className="text-xs text-slate-500 mb-1">{r.apiVersion} · {r.kind} · {r.name}</div>
+            <div className="text-xs text-muted-foreground mb-1">{r.apiVersion} · {r.kind} · {r.name}</div>
             {s ? (
               <SchemaTree
                 schema={s}
@@ -286,7 +286,7 @@ function UIModeEdit() {
                 fields={r.fields as Record<string, { mode: "fixed" | "exposed" }>}
               />
             ) : (
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-muted-foreground">
                 스키마 로딩 중… ({cluster ? `클러스터 ${cluster}` : "클러스터 미선택"})
               </div>
             )}
@@ -318,7 +318,7 @@ function UIModeEdit() {
       }) : prev)}
     />
   ) : (
-    <div className="text-slate-500 text-sm">왼쪽 트리에서 필드를 선택하세요.</div>
+    <div className="text-muted-foreground text-sm">왼쪽 트리에서 필드를 선택하세요.</div>
   );
 
   const preview = (

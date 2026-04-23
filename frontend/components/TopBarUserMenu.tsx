@@ -17,7 +17,7 @@ export function TopBarUserMenu({ email, role }: Props) {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <button className="flex items-center gap-2 rounded px-2 py-1 hover:bg-slate-800" />
+          <button className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent" />
         }
       >
         <RoleBadge role={role} />

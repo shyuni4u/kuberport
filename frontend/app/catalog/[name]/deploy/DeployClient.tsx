@@ -186,7 +186,7 @@ export function DeployClient({
           <h1 className="text-lg font-semibold">
             {isUpdate ? `v${version} 로 업데이트` : "새 배포"}
           </h1>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-muted-foreground">
             {templateName} · v{version}
             {team ? ` · ${team} 팀` : ""}
           </p>
@@ -257,7 +257,7 @@ export function DeployClient({
           <p className="mt-2 whitespace-pre-wrap text-sm text-red-700">{err}</p>
         )}
         {submitting && (
-          <p className="mt-2 text-sm text-slate-600">처리 중…</p>
+          <p className="mt-2 text-sm text-muted-foreground">처리 중…</p>
         )}
       </div>
       <aside className="flex flex-col gap-3">

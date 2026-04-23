@@ -47,11 +47,11 @@ export function YamlPreview({ uiState }: { uiState: UIModeTemplate }) {
     <div className="space-y-3">
       {err && <div className="text-red-600 text-sm whitespace-pre">{err}</div>}
       <div>
-        <h3 className="text-xs font-semibold text-slate-500 mb-1">resources.yaml</h3>
+        <h3 className="text-xs font-semibold text-muted-foreground mb-1">resources.yaml</h3>
         <MonacoPanel value={resources} readOnly language="yaml" height={240} />
       </div>
       <div>
-        <h3 className="text-xs font-semibold text-slate-500 mb-1">ui-spec.yaml</h3>
+        <h3 className="text-xs font-semibold text-muted-foreground mb-1">ui-spec.yaml</h3>
         <MonacoPanel value={uispec} readOnly language="yaml" height={160} />
       </div>
     </div>
