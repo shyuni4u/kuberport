@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api-server";
 import { roleFromGroups } from "@/lib/role";
+import { LocaleSwitch } from "./LocaleSwitch";
 import { Sidebar } from "./Sidebar";
 import { TopBarUserMenu } from "./TopBarUserMenu";
 
@@ -15,8 +16,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       <Sidebar role={role} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-card px-6">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-6">
           <div className="flex-1" />
+          <LocaleSwitch />
           <TopBarUserMenu email={email} role={role} />
         </header>
         <main className="flex-1 overflow-auto">
