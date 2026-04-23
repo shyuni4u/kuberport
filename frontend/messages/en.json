@@ -1,0 +1,21 @@
+{
+  "shell": {
+    "nav": {
+      "catalog": "Catalog",
+      "myReleases": "My releases",
+      "templates": "Templates",
+      "releases": "Releases",
+      "teams": "Teams"
+    },
+    "logout": "Log out",
+    "currentCluster": "Current cluster"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading…",
+    "empty": "No data."
+  }
+}

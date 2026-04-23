@@ -1,21 +1,25 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { ClusterPicker } from "./ClusterPicker";
 import { SidebarNavItem } from "./SidebarNavItem";
 import type { Role } from "@/lib/role";
 
-const NAV_BY_ROLE: Record<Role, Array<{ href: string; label: string }>> = {
+type NavKey = "catalog" | "myReleases" | "templates" | "releases" | "teams";
+
+const NAV_BY_ROLE: Record<Role, Array<{ href: string; key: NavKey }>> = {
   user: [
-    { href: "/catalog", label: "카탈로그" },
-    { href: "/releases", label: "내 릴리스" },
+    { href: "/catalog", key: "catalog" },
+    { href: "/releases", key: "myReleases" },
   ],
   admin: [
-    { href: "/templates", label: "Templates" },
-    { href: "/releases", label: "Releases" },
-    { href: "/admin/teams", label: "Teams" },
+    { href: "/templates", key: "templates" },
+    { href: "/releases", key: "releases" },
+    { href: "/admin/teams", key: "teams" },
   ],
 };
 
-export function Sidebar({ role }: { role: Role }) {
+export async function Sidebar({ role }: { role: Role }) {
+  const t = await getTranslations("shell.nav");
   const nav = NAV_BY_ROLE[role];
   return (
     <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -26,7 +30,7 @@ export function Sidebar({ role }: { role: Role }) {
       </div>
       <nav className="flex-1 space-y-1 p-4">
         {nav.map((item) => (
-          <SidebarNavItem key={item.href} href={item.href} label={item.label} />
+          <SidebarNavItem key={item.href} href={item.href} label={t(item.key)} />
         ))}
       </nav>
       <div className="border-t border-sidebar-border p-4">

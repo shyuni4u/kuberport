@@ -1,0 +1,21 @@
+{
+  "shell": {
+    "nav": {
+      "catalog": "카탈로그",
+      "myReleases": "내 릴리스",
+      "templates": "Templates",
+      "releases": "Releases",
+      "teams": "Teams"
+    },
+    "logout": "로그아웃",
+    "currentCluster": "현재 클러스터"
+  },
+  "common": {
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "edit": "편집",
+    "loading": "로딩 중…",
+    "empty": "데이터가 없습니다."
+  }
+}
