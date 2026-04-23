@@ -1,5 +1,6 @@
 "use client";
 
+import { createElement } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
@@ -18,13 +19,13 @@ type Props = { template: CatalogCardTemplate };
 
 export function CatalogCard({ template }: Props) {
   const t = useTranslations("catalog.card");
-  const Icon = iconFor(template.tags);
+  const icon = iconFor(template.tags);
   const teamLabel = template.owning_team_name ?? "—";
   return (
     <div className="group flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-          <Icon className="h-5 w-5" />
+          {createElement(icon, { className: "h-5 w-5" })}
         </span>
         <h3 className="text-sm font-semibold">{template.display_name}</h3>
       </div>
