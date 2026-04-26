@@ -196,37 +196,49 @@ kuberport/
 ```
 Turborepo/nx 같은 모노레포 도구는 MVP에 과함 — 단순 디렉터리 분리로 시작.
 
-## 11. 운영 호스팅: Hetzner Cloud + k3s 단일 노드
+## 11. 운영 호스팅: 3-Phase 결정 트리 (OCI 타겟 / GCP 부트스트랩 / Hetzner 최후)
 
-상세 근거와 대안 비교는 [ADR 0002](decisions/0002-production-hosting-hetzner-k3s.md).
+상세 근거와 대안 비교는 [ADR 0003](decisions/0003-hosting-oci-always-free.md). 본래 [ADR 0002](decisions/0002-production-hosting-hetzner-k3s.md) 가 Hetzner CAX21 로 결정했으나, 2026-04-26 OCI 계정이 활성화되면서 ADR 0003 으로 대체. OCI A1 capacity 가 즉시 안 잡히는 경우가 흔해서 GCP 90일 크레딧을 부트스트랩 단계로 살려둠. Hetzner 는 OCI 가 끝까지 안 잡힐 때 last-resort.
+
+| Phase | 트리거 | 호스팅 | 비용 | 기간 |
+|---|---|---|---|---|
+| **1. Bootstrap** | OCI A1 capacity 못 잡음 | GCP 무료 크레딧 + `e2-medium` (서울 리전) | $0 (90일 한정) | 며칠~몇 주 |
+| **2. Target** | OCI A1 확보 | OCI Always Free `VM.Standard.A1.Flex` (4 OCPU / 24GB) | $0 영구 | 무기한 (best case) |
+| **3. Last-resort** | GCP 만료 D-30 까지 OCI A1 못 잡음 | Hetzner CAX21 (€7/월) | €7/월 | 무기한 (worst case) |
+
+**공통 스택 (모든 Phase)**
 
 | 레이어 | 선택 |
 |--------|------|
-| VM | Hetzner CAX21 (ARM, 4 vCPU / 8GB / 80GB SSD, €7/월) |
 | k8s | k3s single-node (Traefik Ingress 내장) |
 | TLS | cert-manager + Let's Encrypt |
-| DNS | Cloudflare (무료) |
+| DNS | Cloudflare 무료 — A 레코드 IP 만 Phase 이전 시 교체 (TTL 5분) |
 | 이미지 레지스트리 | GitHub Container Registry (`ghcr.io`) |
-| 이미지 아키텍처 | `linux/arm64` (+ `linux/amd64` 선택, `docker buildx`) |
+| 이미지 아키텍처 | **`linux/amd64` + `linux/arm64` 멀티아치** — Phase 1 (x86) ↔ Phase 2/3 (ARM) zero-touch |
 | CI | GitHub Actions |
-| CD (초기) | GitHub Actions → ssh → `helm upgrade` |
-| CD (장기) | ArgoCD (k3s 내부 pull 기반 GitOps) |
+| CD | GitHub Actions → ssh → `helm upgrade` (장기적으로 ArgoCD) |
+| 백업 (Phase 2 부터) | `pg_dump` 일일 cron → OCI Object Storage (Always Free 10GB) + 외부 복제 (Cloudflare R2 등) |
 
-**예상 월 고정비: 약 €8 (~₩11,000)**
+**예상 월 고정비**: best case Phase 2 직행 = **$1/월 영구 (도메인만)**. worst case Phase 1 → 3 = 90일 무료 후 약 ₩11,000/월.
 
 **배제한 대안**
-- Oracle Cloud Always Free — 사용 불가
-- GCP $300 + GKE Autopilot — 90일 후 $40~70/월, 장기 운영 비경제
-- Civo / DigitalOcean Managed K8s — 크레딧 소진 후 ~$25/월, Hetzner 대비 3~4배
+- OCI Always Free x86 (E2.1.Micro 1c/1GB ×2) — RAM 부족, k3s+Postgres+앱 동시 기동 불가
+- Civo / DigitalOcean Managed K8s — ~$25/월, hobby 예산 초과
 
 **주요 리스크와 완화**
-- 단일 노드 SPOF → Hetzner 스냅샷 + `pg_dump` 외부 백업. 성장 시 2노드 k3s HA로 확장.
-- ARM 이미지 호환성 → `docker buildx` 멀티아키 빌드, 서드파티 이미지는 `docker manifest inspect` 확인.
+- **OCI A1 capacity 부족** (가장 빈번) → Phase 1 GCP 부트스트랩으로 데모 URL 살리고, 백그라운드로 OCI 재시도. 일단 잡히면 절대 종료/재생성 금지. **Always Free 는 홈 리전에서만** 무료라 타 리전 시도는 PAYG 업그레이드 전제
+- **GCP 90일 크레딧 만료 = 강제 결정** → 만료 D-30 알림 캘린더 등록. OCI 못 잡으면 Phase 3 Hetzner 로
+- **OCI idle reclaim** (7일간 CPU 95p < 20% AND network < 20% AND memory < 20% [A1] — 세 조건 모두 충족 시 강제 종료) → k3s+Postgres 가 상시 동작하면 (b)·(c) 는 안 걸리고, (a) 회피용으로 외부 ping (UptimeRobot / GH Actions Schedule)
+- **OCI 정책 리스크** (account reclaim, 정책 위반 강제 종료) → 일일 백업을 OCI 외부(Cloudflare R2 등)에 복제, Phase 3 로 즉시 이전 가능
+- **Phase 1 세팅이 2번 될 가능성** → Helm chart 클라우드 중립 + Terraform/cloud-init + DNS IP 만 교체 → 이전 비용 최소화
+- **단일 노드 SPOF** (모든 Phase) → 정기 백업, Phase 2 의 OCI 한도 내 두 번째 A1 인스턴스로 2노드 k3s HA 확장 가능
+- **ARM 이미지 호환성** → `docker buildx` 멀티아치 빌드 강제 (Phase 1 도 멀티아치로), 서드파티 이미지는 `docker manifest inspect` 확인
 
 **Helm chart 설계 시 기억할 k3s 특수성**
 - Ingress class = `traefik`
 - `LoadBalancer` 서비스는 `servicelb` 로 호스트 포트(80/443) 점유
 - 기본 StorageClass = `local-path` (노드 로컬 디스크)
+- OCI Security List + **Ubuntu 이미지의 OS 방화벽(`iptables`)** 에 80/443 인그레스 규칙 명시 필요 (둘 다 기본 차단)
 - 외부 MetalLB/cloud LB 컨트롤러 없음 (단일 노드 전제)
 
 ## 12. Plan 2 결정 (Admin UX)
