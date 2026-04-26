@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useTransition } from "react";
 
 type Locale = "ko" | "en";
@@ -14,6 +14,7 @@ const ONE_YEAR = 60 * 60 * 24 * 365;
 export function LocaleSwitch() {
   const current = useLocale() as Locale;
   const router = useRouter();
+  const t = useTranslations("shell");
   const [pending, startTransition] = useTransition();
 
   function pick(next: Locale) {
@@ -25,7 +26,7 @@ export function LocaleSwitch() {
 
   return (
     <select
-      aria-label="Language"
+      aria-label={t("localeSwitchLabel")}
       value={current}
       disabled={pending}
       onChange={(e) => pick(e.target.value as Locale)}

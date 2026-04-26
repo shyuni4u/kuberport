@@ -8,7 +8,9 @@
       "teams": "Teams"
     },
     "logout": "Log out",
-    "currentCluster": "Current cluster"
+    "currentCluster": "Current cluster",
+    "openMenu": "Open menu",
+    "localeSwitchLabel": "Select language"
   },
   "common": {
     "save": "Save",

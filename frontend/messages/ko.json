@@ -3,12 +3,14 @@
     "nav": {
       "catalog": "카탈로그",
       "myReleases": "내 릴리스",
-      "templates": "Templates",
-      "releases": "Releases",
-      "teams": "Teams"
+      "templates": "템플릿",
+      "releases": "릴리스",
+      "teams": "팀"
     },
     "logout": "로그아웃",
-    "currentCluster": "현재 클러스터"
+    "currentCluster": "현재 클러스터",
+    "openMenu": "메뉴 열기",
+    "localeSwitchLabel": "언어 선택"
   },
   "common": {
     "save": "저장",
