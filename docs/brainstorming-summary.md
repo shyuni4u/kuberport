@@ -196,13 +196,13 @@ kuberport/
 ```
 Turborepo/nx 같은 모노레포 도구는 MVP에 과함 — 단순 디렉터리 분리로 시작.
 
-## 11. 운영 호스팅: Hetzner Cloud + k3s 단일 노드
+## 11. 운영 호스팅: OCI Always Free (ARM Ampere) + k3s 단일 노드
 
-상세 근거와 대안 비교는 [ADR 0002](decisions/0002-production-hosting-hetzner-k3s.md).
+상세 근거와 대안 비교는 [ADR 0003](decisions/0003-hosting-oci-always-free.md). 본래 [ADR 0002](decisions/0002-production-hosting-hetzner-k3s.md) 가 Hetzner CAX21 로 결정했으나, 2026-04-26 OCI 계정이 활성화되면서 ADR 0003 으로 대체. Hetzner 는 OCI 리스크(capacity 부족·정책 변경 등) 현실화 시 fallback 으로 보존.
 
 | 레이어 | 선택 |
 |--------|------|
-| VM | Hetzner CAX21 (ARM, 4 vCPU / 8GB / 80GB SSD, €7/월) |
+| VM | OCI Always Free `VM.Standard.A1.Flex` (Ampere ARM, 4 OCPU / 24GB / 100GB boot, $0) |
 | k8s | k3s single-node (Traefik Ingress 내장) |
 | TLS | cert-manager + Let's Encrypt |
 | DNS | Cloudflare (무료) |
@@ -211,22 +211,28 @@ Turborepo/nx 같은 모노레포 도구는 MVP에 과함 — 단순 디렉터리
 | CI | GitHub Actions |
 | CD (초기) | GitHub Actions → ssh → `helm upgrade` |
 | CD (장기) | ArgoCD (k3s 내부 pull 기반 GitOps) |
+| 백업 | `pg_dump` 일일 cron → OCI Object Storage (Always Free 10GB) + 외부 복제 (Cloudflare R2 등) |
 
-**예상 월 고정비: 약 €8 (~₩11,000)**
+**예상 월 고정비: 약 $1 (~₩1,500), 도메인만**
 
 **배제한 대안**
-- Oracle Cloud Always Free — 사용 불가
-- GCP $300 + GKE Autopilot — 90일 후 $40~70/월, 장기 운영 비경제
-- Civo / DigitalOcean Managed K8s — 크레딧 소진 후 ~$25/월, Hetzner 대비 3~4배
+- Hetzner CAX21 (€7/월) — 안정성·예측가능성 우수하나 OCI 가 무료 + 사양 3배. **fallback 으로 보존** (ADR 0002)
+- GCP 90일 크레딧 + e2-medium — 90일 하드캡, 만료 후 hobby 예산 초과
+- OCI Always Free x86 (E2.1.Micro 1c/1GB ×2) — RAM 부족, k3s+Postgres+앱 동시 기동 불가
+- Civo / DigitalOcean Managed K8s — ~$25/월, hobby 예산 초과
 
 **주요 리스크와 완화**
-- 단일 노드 SPOF → Hetzner 스냅샷 + `pg_dump` 외부 백업. 성장 시 2노드 k3s HA로 확장.
-- ARM 이미지 호환성 → `docker buildx` 멀티아키 빌드, 서드파티 이미지는 `docker manifest inspect` 확인.
+- **OCI 정책 리스크** (account reclaim, A1 capacity 부족, 정책 위반 강제 종료) → 일일 백업을 OCI 외부(Cloudflare R2 등)에 복제, fallback 으로 ADR 0002 Hetzner 즉시 이전 가능 (Helm chart 클라우드 중립 설계 전제)
+- **A1 capacity 부족** → 신규 인스턴스 생성이 며칠 막힐 수 있음. 일단 잡히면 절대 종료/재생성 금지. 한국 리전(`ap-chuncheon-1`/`ap-seoul-1`) 막히면 `ap-tokyo-1` 으로
+- **idle reclaim** (7일 CPU 5% 미만 시 강제 종료) → kuberport 트래픽이 있으면 비해당. 파일럿 초기에는 cron self-ping
+- 단일 노드 SPOF → OCI Boot Volume 백업 정책 + `pg_dump` 외부 백업. 성장 시 OCI 한도 내 두 번째 A1 인스턴스로 2노드 k3s HA 확장
+- ARM 이미지 호환성 → `docker buildx` 멀티아키 빌드, 서드파티 이미지는 `docker manifest inspect` 확인
 
 **Helm chart 설계 시 기억할 k3s 특수성**
 - Ingress class = `traefik`
 - `LoadBalancer` 서비스는 `servicelb` 로 호스트 포트(80/443) 점유
 - 기본 StorageClass = `local-path` (노드 로컬 디스크)
+- OCI Security List 에 80/443 인그레스 규칙 명시 필요 (기본은 차단)
 - 외부 MetalLB/cloud LB 컨트롤러 없음 (단일 노드 전제)
 
 ## 12. Plan 2 결정 (Admin UX)

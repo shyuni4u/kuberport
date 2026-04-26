@@ -3,8 +3,10 @@
 | | |
 |---|---|
 | 날짜 | 2026-04-16 |
-| 상태 | Accepted |
-| 관련 | [ADR 0001](0001-frontend-deployment-helm-over-vercel.md) (Helm chart 통합 배포) |
+| 상태 | Superseded by [ADR 0003](0003-hosting-oci-always-free.md) (2026-04-26) |
+| 관련 | [ADR 0001](0001-frontend-deployment-helm-over-vercel.md) (Helm chart 통합 배포), [ADR 0003](0003-hosting-oci-always-free.md) (현행 호스팅 — OCI Always Free) |
+
+> **Superseded 메모**: ADR 0002 작성 시점(2026-04-16)에는 OCI Always Free 가 "계정 사용 불가" 로 후보에서 제외됐다. 2026-04-26 OCI 계정이 활성화되어 ADR 0003 으로 대체된다. 본 문서는 **fallback 옵션** (OCI 정지·capacity 부족·정책 변경 시 즉시 €7/월 이전 경로) 으로 본문 보존. 아래 본문은 그 시점의 결정 그대로이며, 현행 결정은 ADR 0003 참조.
 
 ## Context
 

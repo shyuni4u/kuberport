@@ -59,7 +59,7 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 | Frontend | 배포 | k8s Pod (backend와 같은 Helm chart — 단일 Ingress path 라우팅). 근거: [ADR 0001](docs/decisions/0001-frontend-deployment-helm-over-vercel.md) |
 | 통신 | 패턴 | **BFF** — Browser → Next.js Route Handler → Go API → k8s API |
 | 레포 | 구성 | 단일 레포, `backend/` `frontend/` `deploy/` 분리 |
-| 운영 호스팅 | 인프라 | **Hetzner CAX21 (ARM) + k3s single-node**, cert-manager + Let's Encrypt, Cloudflare DNS. 이미지: `ghcr.io`, `linux/arm64`. 근거: [ADR 0002](docs/decisions/0002-production-hosting-hetzner-k3s.md) |
+| 운영 호스팅 | 인프라 | **OCI Always Free `VM.Standard.A1.Flex` (ARM Ampere, 4 OCPU / 24GB) + k3s single-node**, cert-manager + Let's Encrypt, Cloudflare DNS. 이미지: `ghcr.io`, `linux/arm64`. 비용 $0(도메인 제외). 근거: [ADR 0003](docs/decisions/0003-hosting-oci-always-free.md). Fallback (OCI 리스크 현실화 시): [ADR 0002](docs/decisions/0002-production-hosting-hetzner-k3s.md) Hetzner CAX21 — superseded but preserved. |
 | 운영 호스팅 | CI/CD | GitHub Actions (빌드·푸시) → 초기: ssh + `helm upgrade`. 장기: ArgoCD (GitOps, pull 기반) |
 
 **아키텍처 경계 원칙**
