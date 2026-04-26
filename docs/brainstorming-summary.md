@@ -223,8 +223,8 @@ Turborepo/nx 같은 모노레포 도구는 MVP에 과함 — 단순 디렉터리
 
 **주요 리스크와 완화**
 - **OCI 정책 리스크** (account reclaim, A1 capacity 부족, 정책 위반 강제 종료) → 일일 백업을 OCI 외부(Cloudflare R2 등)에 복제, fallback 으로 ADR 0002 Hetzner 즉시 이전 가능 (Helm chart 클라우드 중립 설계 전제)
-- **A1 capacity 부족** → 신규 인스턴스 생성이 며칠 막힐 수 있음. 일단 잡히면 절대 종료/재생성 금지. 한국 리전(`ap-chuncheon-1`/`ap-seoul-1`) 막히면 `ap-tokyo-1` 으로
-- **idle reclaim** (7일 CPU 5% 미만 시 강제 종료) → kuberport 트래픽이 있으면 비해당. 파일럿 초기에는 cron self-ping
+- **A1 capacity 부족** → 신규 인스턴스 생성이 며칠 막힐 수 있음. 일단 잡히면 절대 종료/재생성 금지. **Always Free 는 가입 시 선택한 홈 리전에서만** 무료라 타 리전 fallback 은 PAYG 업그레이드가 필요 — 한국 리전이 안 풀리면 차라리 ADR 0002 Hetzner 로 이전이 깔끔
+- **idle reclaim** (7일간 CPU 95p < 20% AND network < 20% AND memory < 20% [A1] — 세 조건 모두 충족 시 강제 종료) → k3s+Postgres 가 상시 동작하면 (b)·(c) 는 안 걸리고, (a) 회피용으로 외부 ping (UptimeRobot / GH Actions Schedule)
 - 단일 노드 SPOF → OCI Boot Volume 백업 정책 + `pg_dump` 외부 백업. 성장 시 OCI 한도 내 두 번째 A1 인스턴스로 2노드 k3s HA 확장
 - ARM 이미지 호환성 → `docker buildx` 멀티아키 빌드, 서드파티 이미지는 `docker manifest inspect` 확인
 
@@ -232,7 +232,7 @@ Turborepo/nx 같은 모노레포 도구는 MVP에 과함 — 단순 디렉터리
 - Ingress class = `traefik`
 - `LoadBalancer` 서비스는 `servicelb` 로 호스트 포트(80/443) 점유
 - 기본 StorageClass = `local-path` (노드 로컬 디스크)
-- OCI Security List 에 80/443 인그레스 규칙 명시 필요 (기본은 차단)
+- OCI Security List + **Ubuntu 이미지의 OS 방화벽(`iptables`)** 에 80/443 인그레스 규칙 명시 필요 (둘 다 기본 차단)
 - 외부 MetalLB/cloud LB 컨트롤러 없음 (단일 노드 전제)
 
 ## 12. Plan 2 결정 (Admin UX)

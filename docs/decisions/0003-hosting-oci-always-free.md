@@ -43,7 +43,7 @@ ADR 0002 (Hetzner) 는 Superseded 처리하지만 **fallback 옵션으로 본문
 | 계정 | Oracle Cloud Always Free | 카드 등록 필요(verification only). 영구 무료, 자동 과금은 Pay-As-You-Go 업그레이드 시에만 |
 | VM | **`VM.Standard.A1.Flex`** (Ampere ARM, 4 OCPU / 24GB) | Always Free 최대 한도. 단일 인스턴스로 사용 (한도 자체는 OCPU 4 / RAM 24GB 합계라 분할도 가능하나 단일이 운영 단순) |
 | 부팅 볼륨 | 100GB block (Always Free 한도 200GB 중 절반) | 나머지 100GB 는 future Postgres PV 용 여유 |
-| 리전 | `ap-chuncheon-1` (춘천) 또는 `ap-seoul-1` 우선, 부족 시 가까운 차순위 | A1 capacity 부족 이슈가 잦아 **여러 리전 회전** 필요할 수 있음. 한국 리전이 안 잡히면 `ap-tokyo-1` 으로 |
+| 리전 | `ap-chuncheon-1` (춘천) 또는 `ap-seoul-1` (홈 리전 — 가입 시 한 번 선택, 변경 불가) | **Always Free 자원은 홈 리전에서만 무료** — 타 리전은 PAYG 업그레이드 필요. capacity 부족 시 ADR 0002 fallback 이 더 깔끔할 수 있음 |
 | OS | Ubuntu 24.04 LTS (ARM) | OCI 공식 이미지 |
 | k8s | **k3s** (single-node) — ADR 0002 와 동일 | Helm chart 그대로 재사용 |
 | TLS | cert-manager + Let's Encrypt (HTTP-01 challenge) | 무료. OCI Security List 에 80/443 인그레스 허용 필요 |
@@ -80,14 +80,14 @@ ADR 0002 (Hetzner) 는 Superseded 처리하지만 **fallback 옵션으로 본문
 
 - **OCI Always Free 정책 리스크** — 다음 이벤트가 알려져 있음:
   - **A1 capacity 부족** — 인기 리전에서 신규 인스턴스 생성이 며칠~몇 주 막힐 수 있음. 완화: 여러 리전 시도, 일단 잡히면 절대 종료/재생성 금지
-  - **idle reclaim** — Always Free 인스턴스가 7일간 CPU 5% 미만이면 강제 종료될 수 있음 (공식 정책). kuberport 는 항상 트래픽이 있으므로 일반적으로 비해당, 다만 파일럿 초기에 사용자 0 일 때는 cron 으로 self-ping
+  - **idle reclaim** — Always Free 인스턴스가 **7일간 (a) CPU 95th percentile < 20% AND (b) network < 20% AND (c) memory < 20% (A1 만 해당)** — 세 조건 모두 충족 시 강제 종료 대상 (공식 정책, [OCI 문서](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm)). k3s + Postgres 가 상시 동작하면 (b)·(c) 는 일반적으로 안 걸리고 (a) 는 트래픽 0 일 때 control-plane idle 만으로 95p 20% 미만이 가능하므로, 파일럿 초기엔 외부 ping (UptimeRobot 또는 GitHub Actions Schedule) 으로 (a) 회피
   - **계정 정지** — 결제 분쟁/약관 위반 시 사전 통보 짧음. 완화: `pg_dump` 가 매일 OCI Object Storage 외부에도 복제(Cloudflare R2 등 제2 백업)
   - **Pay-As-You-Go 업그레이드 시 자동 과금** — Always Free 모드 유지 확인 필수
 - **단일 노드 SPOF** — VM 이 죽으면 서비스 전체 다운. 완화책 (ADR 0002 와 동일):
   - OCI Boot Volume 백업 (정책 단위 자동화)
   - `pg_dump` 일일 cron → Object Storage
   - 장기적으로 동일 OCI 계정 내 두 번째 A1 인스턴스로 2노드 k3s HA 확장 (Always Free 한도 내)
-- **EU 리전 미선택 시 한국 capacity 의존** — 춘천/서울 리전이 막히면 도쿄로 대체, 레이턴시 +30ms
+- **홈 리전 잠김** — 가입 시 한 번 선택한 홈 리전에서만 Always Free. 한국 리전 capacity 부족이 풀리지 않으면 (a) 일정 기간 대기 후 재시도, (b) PAYG 업그레이드 (다른 리전 무료 한도 사용 가능, 한도 초과분만 과금), (c) ADR 0002 Hetzner 로 이전 — €7/월 영구. (c) 가 가장 깔끔한 fallback
 - **OCI 콘솔/API UX** — AWS/GCP 대비 거칠다는 평. 운영 학습 비용 약간 추가
 - **카드 등록 필요** — Always Free 계정이라도 verification 차원. 완화: 카드 한도 낮은 계좌 사용
 
@@ -116,7 +116,7 @@ ADR 0002 (Hetzner) 는 Superseded 처리하지만 **fallback 옵션으로 본문
 
 - [ ] OCI 계정 verification (카드 등록, Always Free 모드 확인)
 - [ ] `VM.Standard.A1.Flex` (4 OCPU / 24GB / 100GB boot) 프로비저닝 — `ap-chuncheon-1` 우선, 부족 시 차순위
-- [ ] Security List 80/443 인그레스 + SSH 22 (소스 IP 제한) 허용
+- [ ] Security List **및 OS 방화벽 (`iptables` — Ubuntu 이미지에서 기본 차단됨)** 80/443 인그레스 + SSH 22 (소스 IP 제한) 허용
 - [ ] k3s install + Traefik Ingress 동작 확인
 - [ ] 도메인 + Cloudflare A 레코드 연결
 - [ ] cert-manager + Let's Encrypt HTTP-01 발급 확인
@@ -126,7 +126,7 @@ ADR 0002 (Hetzner) 는 Superseded 처리하지만 **fallback 옵션으로 본문
 - [ ] **백업 외부 복제** (Cloudflare R2 또는 Hetzner Storage Box) — OCI 정지 리스크 헤지
 - [ ] OIDC (Google OAuth 또는 dex) 설정
 - [ ] 동료에게 URL 공유 + `docs/qa-checklist.md` 복사본으로 피드백 요청
-- [ ] OCI fallback 트리거 모니터링 cron (인스턴스 health, 계정 상태)
+- [ ] OCI fallback 트리거 **외부** 모니터링 (UptimeRobot 또는 GitHub Actions Schedule — VM 내부 cron 은 VM 다운 시 침묵하므로 무용). 인스턴스 health + 계정 상태 + idle reclaim 임계 (CPU 95p / network / memory 20% 라인) 감시
 
 ## 영향 받는 문서
 
