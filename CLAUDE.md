@@ -75,11 +75,14 @@ kuberport/
 ├── docs/
 │   ├── brainstorming-summary.md           ← 브레인스토밍 결정 요약
 │   ├── dev-setup.md                       ← 개발 환경 설정 가이드
+│   ├── oci-capacity-retry.md              ← OCI A1 capacity 자동 재시도 (ADR 0003 Phase 2 부트스트랩)
 │   ├── deploy/
 │   │   └── images.md                      ← 컨테이너 이미지 멀티아치 빌드/푸시 (GHA + 로컬)
 │   ├── superpowers/
 │   │   └── specs/                         ← 디자인 스펙 (다음 단계에 생성)
 │   └── decisions/                         ← ADR (필요 시 생성)
+└── scripts/
+    └── oci-capacity-retry/                ← OCI 인스턴스 launch 자동화 (cron 15분, 머신 이전 가능)
 ```
 
 ## 세션 시작 시: 개발 환경 먼저 확인

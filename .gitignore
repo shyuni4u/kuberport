@@ -12,6 +12,10 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# OCI capacity retry — 실제 OCID 가 들어가는 config.env 는 머신 로컬에만 두고 절대 commit 금지.
+# (정상 위치는 ~/oci-capacity-retry/config.env. repo 안에 들어오는 건 사고)
+scripts/oci-capacity-retry/config.env
+
 # Brainstorming session scratch (Claude Code superpowers)
 .superpowers/
 
