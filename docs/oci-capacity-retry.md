@@ -1,7 +1,7 @@
 # OCI A1.Flex Capacity 자동 재시도
 
 ADR 0003 Phase 2 (OCI Always Free A1.Flex 4 OCPU / 24GB) 인스턴스 확보용 cron 스크립트.
-A1 capacity 가 항상 부족해서 콘솔 수동 클릭으로는 못 잡으므로, 5분 간격으로 launch 요청을
+A1 capacity 가 항상 부족해서 콘솔 수동 클릭으로는 못 잡으므로, 15분 간격으로 launch 요청을
 자동 반복하다가 잡히는 순간 인스턴스 생성 + Public IP 기록.
 
 관련: [ADR 0003](decisions/0003-hosting-oci-always-free.md)
@@ -140,8 +140,13 @@ cd <repo>/scripts/oci-capacity-retry
 ~/oci-capacity-retry/status.sh
 ```
 
-`status.sh` 에 "⏳ 진행 중" 이 뜨면 정상. 5분마다 자동 시도. 잡히면 `~/oci-capacity-retry/SUCCESS`
+`status.sh` 에 "⏳ 진행 중" 이 뜨면 정상. 15분마다 자동 시도. 잡히면 `~/oci-capacity-retry/SUCCESS`
 와 `PUBLIC_IP` 파일이 생기고 그 이후 cron 호출은 즉시 no-op.
+
+> 💡 **왜 15분인가?** 처음엔 5분으로 시작했으나 실측 결과 OCI launch API 의 rate-limit
+> cool-down 이 5분보다 길어 4시간 동안 47/55 호출이 rate-limit 응답만 받음 (실효 시도율 3%).
+> 15분 간격으로 cool-down 보다 충분히 길게 둬서 매 호출이 진짜 capacity 체크까지 도달하게 함.
+> `hitrov/oci-arm-host-capacity` 도 같은 구간을 권장.
 
 ## 다른 머신에서 이어받기 (이전)
 
@@ -251,7 +256,7 @@ ssh -i ~/.ssh/oci_kuberport ubuntu@$(cat ~/oci-capacity-retry/PUBLIC_IP)
 | 증상 | 원인 / 해결 |
 |------|------|
 | `NotAuthenticated` | `~/.oci/config` 의 user/tenancy/region/fingerprint 와 콘솔 Profile API Keys 의 fingerprint 가 안 맞음. setup 다시 |
-| `TooManyRequests` | OCI rate limit. 짧은 시간에 launch 너무 많이 보냄. 5분만 기다리면 풀림 — cron 5분 간격이 이걸 자동으로 회피 |
+| `TooManyRequests` 가 모든 호출에서 발생 | OCI rate-limit cool-down 이 cron 간격보다 김. 처음엔 5분 → **15분 으로 늘려야** 회피됨 (위 "왜 15분인가?" 참조). `crontab -e` 에서 `*/5` → `*/15` 변경 또는 install.sh 재실행 |
 | `LimitExceeded ... service limit` | Always Free 한도 (4 OCPU / 24 GB / 200GB block) 초과. config.env 의 OCPU/메모리/볼륨 확인 |
 | `Out of host capacity` 만 계속 | 정상 — 며칠~몇 주 걸릴 수 있음. WSL/머신 켜둔 채 기다림 |
 | `bash: oci: command not found` (대화형 셸에서) | `pipx ensurepath` 후 `exec $SHELL` 안 함. 새 셸 열기 |
