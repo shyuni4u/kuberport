@@ -168,7 +168,7 @@ Best case (Phase 2 직행): 첫날부터 영구 $1/월. Worst case (Phase 1 → 
 - [ ] (A1 못 잡힘) GCP 계정 + 90일 크레딧 활성화, **예산 알림 $1 한도** 설정
 - [ ] `e2-medium` VM (`asia-northeast3`, Ubuntu 24.04) 프로비저닝
 - [ ] 도메인 + Cloudflare A 레코드 → GCP VM IP
-- [ ] **이미지 빌드 파이프라인 멀티아치 (`linux/amd64` + `linux/arm64`)** — 이 시점에 강제, Phase 2/3 이전 시 zero-touch
+- [x] **이미지 빌드 파이프라인 멀티아치 (`linux/amd64` + `linux/arm64`)** — 이 시점에 강제, Phase 2/3 이전 시 zero-touch ([docs/deploy/images.md](../deploy/images.md), `.github/workflows/build-images.yml`)
 - [ ] Helm chart 작성 + GCP VM 에 `helm upgrade`
 - [ ] cert-manager + Let's Encrypt
 - [ ] OIDC (Google OAuth 또는 dex)
