@@ -9,7 +9,15 @@ crontab -l 2>/dev/null | grep oci-capacity-retry || echo "❌ crontab 미등록"
 
 echo ""
 echo "=== Cron 데몬 상태 ==="
-systemctl is-active cron && echo "  ✅ cron 동작 중" || echo "  ❌ cron 정지"
+# Linux (systemd) 와 macOS (launchd 가 cron 을 띄움) 모두에서 동작.
+if systemctl is-active --quiet cron 2>/dev/null \
+   || systemctl is-active --quiet crond 2>/dev/null \
+   || pgrep -x cron >/dev/null 2>&1 \
+   || pgrep -x crond >/dev/null 2>&1; then
+  echo "  ✅ cron 동작 중"
+else
+  echo "  ❌ cron 정지 — Linux: 'sudo systemctl start cron', macOS: cron 은 첫 crontab 등록 시 자동 기동"
+fi
 
 echo ""
 echo "=== 최근 retry.log (마지막 10줄) ==="

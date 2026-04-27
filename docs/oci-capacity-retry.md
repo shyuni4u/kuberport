@@ -174,6 +174,34 @@ crontab -l   # 등록 빠진 거 확인
 다만 콘솔에 키가 두 개 등록된 상태가 되니 옛 머신 키는 정리 (Profile → API Keys 에서 삭제,
 SSH 는 인스턴스 생성 후 `~ubuntu/.ssh/authorized_keys` 에서 줄 삭제).
 
+### 4. 옛 머신 정리 (보안 — 키 회수)
+
+이전 후 옛 머신에 남은 자격 증명은 **반드시 삭제 또는 무효화**. 옛 머신을 다시 안 쓸 거면 더더욱.
+
+```bash
+# 옛 머신에서
+shred -u ~/.oci/oci_api_key.pem ~/.oci/oci_api_key_public.pem 2>/dev/null \
+  || rm -f ~/.oci/oci_api_key.pem ~/.oci/oci_api_key_public.pem
+shred -u ~/.ssh/oci_kuberport ~/.ssh/oci_kuberport.pub 2>/dev/null \
+  || rm -f ~/.ssh/oci_kuberport ~/.ssh/oci_kuberport.pub
+rm -rf ~/oci-capacity-retry/   # config.env 도 함께 (OCID 자체가 비밀은 아니지만 깔끔)
+```
+
+OCI 콘솔에서도 옛 머신의 API key 삭제 (새 머신에서 새 키 만들었거나, 옛 머신을 재활용 안 할
+경우):
+
+1. Profile → My Profile → Resources → **API Keys**
+2. 옛 머신 fingerprint 행 (`~/.oci/config` 의 fingerprint 참고) → ⋮ → **Delete**
+3. 새 머신의 fingerprint 만 남았는지 확인
+
+인스턴스 SSH `authorized_keys` 정리 (인스턴스 생성 후, 새 머신 SSH 로 들어가서):
+
+```bash
+ssh -i ~/.ssh/oci_kuberport ubuntu@$(cat ~/oci-capacity-retry/PUBLIC_IP)
+# 인스턴스 안에서
+vi ~/.ssh/authorized_keys   # 옛 머신 host 가 들어간 줄 삭제
+```
+
 ### 3. 새 머신 세팅
 
 ```bash

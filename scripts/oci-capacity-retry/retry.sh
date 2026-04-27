@@ -27,24 +27,27 @@ if [[ -f "$SUCCESS_FILE" ]]; then
   exit 0
 fi
 
-# 같은 이름의 인스턴스가 RUNNING/PROVISIONING 상태로 이미 있으면 중복 launch 방지
-existing=$(oci compute instance list \
-  --compartment-id "$OCI_COMPARTMENT_ID" \
-  --display-name "$OCI_INSTANCE_NAME" \
-  --lifecycle-state RUNNING \
-  --query 'data[0].id' \
-  --raw-output 2>/dev/null || true)
+# 같은 이름의 인스턴스가 TERMINATED/TERMINATING 외 상태로 이미 있으면 중복 launch 방지.
+# RUNNING 만 보면 PROVISIONING/STARTING 단계에서 또 launch 시도 → "already exists" 영구 에러로 cron 자기 자신 끔.
+lookup_existing() {
+  oci compute instance list \
+    --compartment-id "$OCI_COMPARTMENT_ID" \
+    --display-name "$OCI_INSTANCE_NAME" \
+    --query 'data[?"lifecycle-state"!=`TERMINATED` && "lifecycle-state"!=`TERMINATING`]|[0].id' \
+    --raw-output 2>/dev/null || true
+}
 
+existing=$(lookup_existing)
 if [[ -n "$existing" && "$existing" != "null" ]]; then
-  log "Instance '$OCI_INSTANCE_NAME' already RUNNING ($existing), marking SUCCESS"
+  log "Instance '$OCI_INSTANCE_NAME' exists ($existing), marking SUCCESS"
   echo "$existing" > "$SUCCESS_FILE"
   exit 0
 fi
 
-# Round-robin FD: state 파일에 마지막 시도한 index (1/2/3) 저장 → 다음 호출 때 +1
+# Round-robin FD: in-memory 만 advance, state 저장은 launch 시도가 OCI 에 실제로 도달한 후에 (rate-limit 으로
+# 거부된 경우 FD 를 진짜로 시도한 게 아니므로 다음 tick 에서 같은 FD 재시도하게 함).
 last_fd=$(cat "$STATE_FILE" 2>/dev/null || echo "0")
 next_fd=$(( (last_fd % 3) + 1 ))
-echo "$next_fd" > "$STATE_FILE"
 FD_NAME="FAULT-DOMAIN-${next_fd}"
 
 log "Attempting launch: AD=$OCI_AD_NAME FD=$FD_NAME shape=$OCI_SHAPE ${OCI_OCPUS}c/${OCI_MEMORY_GB}GB"
@@ -83,17 +86,31 @@ if [[ $rc -eq 0 ]]; then
 fi
 
 # 에러 분류
-if echo "$output" | grep -qiE "out of (host )?capacity|InternalError.*capacity"; then
+if echo "$output" | grep -qiE "out of (host )?capacity"; then
+  echo "$next_fd" > "$STATE_FILE"   # FD 가 실제로 시도된 경우에만 advance
   log "Out of capacity on $FD_NAME — will retry next tick (next FD: $(( (next_fd % 3) + 1 )))"
   exit 0  # cron 이 다시 부르도록 0 으로 빠짐 (스크립트 자체는 정상)
 elif echo "$output" | grep -qiE "TooManyRequests|429|rate"; then
-  log "Rate limited — backing off (next attempt: 다음 cron tick)"
+  log "Rate limited — backing off (next attempt: 다음 cron tick, 같은 FD 재시도)"
+  # state 갱신 안 함 — rate limit 은 OCI 가 처리 전에 거부한 거라 FD 를 진짜로 시도한 게 아님
   exit 0
-elif echo "$output" | grep -qiE "LimitExceeded.*service.*limit|already exists"; then
-  log "PERMANENT ERROR (limit/duplicate) — disabling retry. Output: $output"
+elif echo "$output" | grep -qiE "instance.*already exists|already a (resource|instance)"; then
+  # capacity 잡혔는데 wait timeout 등으로 같은 이름 재시도된 경우 — 이미 만들어진 인스턴스 회수 후 SUCCESS
+  log "Instance with name '$OCI_INSTANCE_NAME' already exists — looking up to mark SUCCESS"
+  recovered=$(lookup_existing)
+  if [[ -n "$recovered" && "$recovered" != "null" ]]; then
+    echo "$recovered" > "$SUCCESS_FILE"
+    log "🎉 Recovered existing instance: $recovered"
+  else
+    log "WARNING: 'already exists' 응답이지만 lookup 실패 — 다음 tick 재시도"
+  fi
+  exit 0
+elif echo "$output" | grep -qiE "LimitExceeded.*service.*limit"; then
+  log "PERMANENT ERROR (서비스 한도 초과) — disabling retry. Output: $output"
   echo "$output" > "$SCRIPT_DIR/ERROR"
   exit 1
 else
+  echo "$next_fd" > "$STATE_FILE"   # 알 수 없는 에러도 일단 시도된 것으로 간주
   log "Unexpected error (will retry next tick): $output"
   exit 0
 fi

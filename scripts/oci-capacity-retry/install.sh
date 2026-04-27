@@ -15,6 +15,19 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="$HOME/oci-capacity-retry"
 
+echo "[0/4] 사전 조건 검증"
+missing=()
+command -v oci >/dev/null 2>&1 || missing+=("oci CLI")
+[[ -f "$HOME/.oci/config" ]] || missing+=("~/.oci/config")
+[[ -f "$HOME/.oci/oci_api_key.pem" ]] || missing+=("~/.oci/oci_api_key.pem")
+[[ -f "$HOME/.ssh/oci_kuberport.pub" ]] || missing+=("~/.ssh/oci_kuberport.pub")
+if [[ ${#missing[@]} -gt 0 ]]; then
+  echo "  ❌ 누락: ${missing[*]}"
+  echo "  → docs/oci-capacity-retry.md '새 머신에서 처음 세팅' 섹션 참조"
+  exit 1
+fi
+echo "  ✅ oci CLI / config / API key / SSH 키 모두 확인"
+
 echo "[1/4] 디렉터리 생성 → $TARGET_DIR"
 mkdir -p "$TARGET_DIR"
 
