@@ -24,8 +24,20 @@ echo "=== 최근 retry.log (마지막 10줄) ==="
 [[ -f "$SCRIPT_DIR/retry.log" ]] && tail -10 "$SCRIPT_DIR/retry.log" || echo "(아직 실행 기록 없음)"
 
 echo ""
-echo "=== 마지막 시도 FD ==="
-[[ -f "$SCRIPT_DIR/state" ]] && echo "  FD-$(cat "$SCRIPT_DIR/state")" || echo "  (state 없음)"
+echo "=== FD 진행 상태 ==="
+# state 파일은 "마지막으로 capacity 응답을 받은 FD" — rate-limit 으로 거부된 시도는 advance 안 함.
+# 실제 가장 최근 시도는 로그에서 추출해서 따로 표시.
+if [[ -f "$SCRIPT_DIR/retry.log" ]]; then
+  last_attempt=$(grep "Attempting launch" "$SCRIPT_DIR/retry.log" | tail -1 | grep -oE 'FAULT-DOMAIN-[0-9]+' | grep -oE '[0-9]+$')
+  [[ -n "$last_attempt" ]] && echo "  최근 시도        : FD-$last_attempt" || echo "  최근 시도        : (아직 없음)"
+fi
+if [[ -f "$SCRIPT_DIR/state" ]]; then
+  state_fd=$(cat "$SCRIPT_DIR/state")
+  next_fd=$(( (state_fd % 3) + 1 ))
+  echo "  capacity 회전    : FD-$state_fd (다음 cron 은 FD-$next_fd)"
+else
+  echo "  capacity 회전    : (아직 capacity 응답 받은 적 없음)"
+fi
 
 echo ""
 if [[ -f "$SCRIPT_DIR/SUCCESS" ]]; then
