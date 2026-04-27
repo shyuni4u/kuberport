@@ -28,7 +28,7 @@ export function ClusterPicker() {
     <select
       value={current}
       onChange={(e) => pick(e.target.value)}
-      className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs"
+      className="w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
     >
       {clusters.map((c) => (
         <option key={c.name} value={c.name}>

@@ -28,15 +28,15 @@ export default async function AdminTeamsPage() {
       <form action={createTeam} className="flex gap-2 mb-6">
         <input name="name" placeholder="slug (예: platform)" className="border rounded px-3 py-1.5" required />
         <input name="display_name" placeholder="표시 이름" className="border rounded px-3 py-1.5" />
-        <button className="px-4 py-1.5 bg-blue-600 text-white rounded">새 팀</button>
+        <button className="px-4 py-1.5 bg-primary text-primary-foreground rounded">새 팀</button>
       </form>
       <ul className="space-y-2">
         {teams.map(t => (
           <li key={t.id}>
-            <Link href={`/admin/teams/${t.id}`} className="text-blue-600">
+            <Link href={`/admin/teams/${t.id}`} className="text-primary">
               {t.display_name ?? t.name}
             </Link>
-            <span className="text-xs text-slate-500 ml-2">{t.name}</span>
+            <span className="text-xs text-muted-foreground ml-2">{t.name}</span>
           </li>
         ))}
       </ul>

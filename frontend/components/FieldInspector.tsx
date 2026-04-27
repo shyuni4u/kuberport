@@ -29,14 +29,14 @@ export function FieldInspector({
 
   return (
     <div className="border rounded p-4 text-sm">
-      <div className="font-mono text-xs text-slate-500 mb-2">{path}</div>
+      <div className="font-mono text-xs text-muted-foreground mb-2">{path}</div>
       <div className="flex gap-2 mb-3">
         <button
-          className={`px-2 py-1 rounded text-xs ${mode === "fixed" ? "bg-blue-600 text-white" : "bg-slate-100"}`}
+          className={`px-2 py-1 rounded text-xs ${mode === "fixed" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
           onClick={() => onChange({ mode: "fixed", fixedValue: defaultFor(schemaType) })}
         >값 고정</button>
         <button
-          className={`px-2 py-1 rounded text-xs ${mode === "exposed" ? "bg-blue-600 text-white" : "bg-slate-100"}`}
+          className={`px-2 py-1 rounded text-xs ${mode === "exposed" ? "bg-primary text-primary-foreground" : "bg-muted"}`}
           onClick={() => onChange({ mode: "exposed", uiSpec: { label: path, type: schemaType, required: false } })}
         >사용자 노출</button>
         {value && <button className="ml-auto text-xs text-red-600" onClick={onClear}>초기화</button>}
@@ -86,7 +86,7 @@ export function FieldInspector({
                 ))}
                 <button
                   type="button"
-                  className="text-xs text-blue-600 mt-1"
+                  className="text-xs text-primary mt-1"
                   onClick={() => {
                     const next = [...(value.uiSpec.values ?? []), ""];
                     onChange({ ...value, uiSpec: { ...value.uiSpec, values: next } });

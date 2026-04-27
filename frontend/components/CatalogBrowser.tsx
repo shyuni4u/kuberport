@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CatalogCard, type CatalogCardTemplate } from "./CatalogCard";
@@ -8,6 +9,7 @@ import { CatalogCard, type CatalogCardTemplate } from "./CatalogCard";
 type Props = { templates: CatalogCardTemplate[] };
 
 export function CatalogBrowser({ templates }: Props) {
+  const t = useTranslations("catalog");
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string>("");
 
@@ -30,8 +32,8 @@ export function CatalogBrowser({ templates }: Props) {
 
   if (templates.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-2 py-16 text-slate-500">
-        <p className="text-sm">관리자가 아직 템플릿을 만들지 않았습니다.</p>
+      <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
+        <p className="text-sm">{t("emptyNoTemplates")}</p>
       </div>
     );
   }
@@ -39,10 +41,10 @@ export function CatalogBrowser({ templates }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">카탈로그</h1>
+        <h1 className="text-xl font-semibold">{t("title")}</h1>
         <Input
           className="max-w-xs"
-          placeholder="템플릿 검색…"
+          placeholder={t("searchPlaceholder")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -59,8 +61,8 @@ export function CatalogBrowser({ templates }: Props) {
         </ToggleGroup>
       )}
       {filtered.length === 0 ? (
-        <div className="py-12 text-center text-sm text-slate-500">
-          일치하는 템플릿이 없습니다. 검색어나 태그 필터를 바꿔보세요.
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          {t("emptyNoMatch")}
         </div>
       ) : (
         <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">

@@ -28,11 +28,11 @@ export function ResourcesPreview({ renderedYaml, pending }: Props) {
   }, [renderedYaml]);
 
   return (
-    <aside className="flex flex-col gap-3 rounded-md bg-slate-50 p-4">
+    <aside className="flex flex-col gap-3 rounded-md bg-muted/40 p-4">
       <h2 className="text-sm font-medium">만들어질 리소스</h2>
-      {pending && <p className="text-xs text-slate-500">렌더링 중…</p>}
+      {pending && <p className="text-xs text-muted-foreground">렌더링 중…</p>}
       {!pending && resources.length === 0 && (
-        <p className="text-xs text-slate-500">폼을 채우면 미리보기가 여기 표시됩니다.</p>
+        <p className="text-xs text-muted-foreground">폼을 채우면 미리보기가 여기 표시됩니다.</p>
       )}
       {resources.length > 0 && (
         <ul className="flex flex-col gap-1">
@@ -41,7 +41,7 @@ export function ResourcesPreview({ renderedYaml, pending }: Props) {
               key={`${r.kind}-${r.name}-${idx}`}
               className="flex items-center justify-between text-sm"
             >
-              <span className="font-mono text-xs text-slate-600">{r.kind}</span>
+              <span className="font-mono text-xs text-muted-foreground">{r.kind}</span>
               <span>{r.name}</span>
             </li>
           ))}

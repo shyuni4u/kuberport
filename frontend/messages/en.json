@@ -1,0 +1,41 @@
+{
+  "shell": {
+    "nav": {
+      "catalog": "Catalog",
+      "myReleases": "My releases",
+      "templates": "Templates",
+      "releases": "Releases",
+      "teams": "Teams"
+    },
+    "logout": "Log out",
+    "currentCluster": "Current cluster",
+    "openMenu": "Open menu",
+    "localeSwitchLabel": "Select language"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading…",
+    "empty": "No data."
+  },
+  "catalog": {
+    "title": "Catalog",
+    "searchPlaceholder": "Search templates…",
+    "emptyNoTemplates": "No templates have been published yet.",
+    "emptyNoMatch": "No templates match your search or tag filter.",
+    "card": {
+      "deploy": "Deploy →"
+    }
+  },
+  "releases": {
+    "myTitle": "My releases",
+    "table": {
+      "name": "Name",
+      "template": "Template",
+      "namespace": "Namespace",
+      "empty": "No releases yet."
+    }
+  }
+}

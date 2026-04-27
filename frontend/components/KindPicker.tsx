@@ -52,14 +52,14 @@ export function KindPicker({
           <button
             key={k.gv + "/" + k.kind}
             onClick={() => onPick(k)}
-            className="px-3 py-1 border rounded hover:bg-slate-100 text-sm"
+            className="px-3 py-1 border rounded hover:bg-muted text-sm"
           >
             {k.kind}
           </button>
         ))}
       </div>
       <details>
-        <summary className="cursor-pointer text-sm text-slate-700">전체 GroupVersion 목록 ({gvs.length})</summary>
+        <summary className="cursor-pointer text-sm text-foreground">전체 GroupVersion 목록 ({gvs.length})</summary>
         <div className="mt-2 max-h-64 overflow-auto text-xs font-mono">
           {err && <div className="text-red-600">{err}</div>}
           {gvs.map(gv => (

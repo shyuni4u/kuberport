@@ -206,7 +206,7 @@ function UIModeNew() {
               onChange={e => setResources(prev => prev.map((x, idx) => idx === i ? { ...x, name: e.target.value } : x))}
               className="w-full border-b text-sm font-mono mb-2"
             />
-            <div className="text-xs text-slate-500 mb-2">{r.gv} · {r.kind}</div>
+            <div className="text-xs text-muted-foreground mb-2">{r.gv} · {r.kind}</div>
             <SchemaTree
               schema={r.rootSchema}
               selectedPath={active?.resIdx === i ? active.path : null}
@@ -235,7 +235,7 @@ function UIModeNew() {
       }))}
     />
   ) : (
-    <div className="text-slate-500 text-sm">왼쪽 트리에서 필드를 선택하세요.</div>
+    <div className="text-muted-foreground text-sm">왼쪽 트리에서 필드를 선택하세요.</div>
   );
 
   const preview = (
@@ -255,7 +255,7 @@ function UIModeNew() {
     <div className="space-y-3">
       <MetaRow meta={meta} onChange={setMeta} hideTeam />
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-slate-600">소유 팀</span>
+        <span className="text-muted-foreground">소유 팀</span>
         <Select
           value={owningTeamId === "" ? GLOBAL_TEAM : owningTeamId}
           onValueChange={(v) => setOwningTeamId(!v || v === GLOBAL_TEAM ? "" : v)}
@@ -274,7 +274,7 @@ function UIModeNew() {
         </Select>
       </div>
       {resources.length === 0 && (
-        <div className="rounded border-2 border-dashed border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
+        <div className="rounded border-2 border-dashed border-primary/30 bg-accent p-3 text-sm text-accent-foreground">
           <strong>시작하려면</strong> 아래 트리 패널에서 k8s 리소스 종류(Deployment, Service 등)를 선택해 추가하세요. 스키마가 로드되면 노출할 필드를 트리에서 고르고, 오른쪽 인스펙터에서 라벨·기본값을 편집할 수 있습니다.
         </div>
       )}
@@ -374,7 +374,7 @@ function YamlModeNew() {
     <div className="space-y-3">
       <MetaRow meta={meta} onChange={setMeta} hideTeam />
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-slate-600">소유 팀</span>
+        <span className="text-muted-foreground">소유 팀</span>
         <Select
           value={owningTeamId === "" ? GLOBAL_TEAM : owningTeamId}
           onValueChange={(v) => setOwningTeamId(!v || v === GLOBAL_TEAM ? "" : v)}

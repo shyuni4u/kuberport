@@ -23,7 +23,7 @@ export function ReleaseHeader({ data }: { data: ReleaseHeaderData }) {
           <KubeTermsToggle />
         </div>
       </div>
-      <div className="text-sm text-slate-600">
+      <div className="text-sm text-muted-foreground">
         {data.template.name} v{data.template.version} · {data.cluster} / {data.namespace}
         {data.created_at ? ` · ${new Date(data.created_at).toLocaleString()}` : ""}
       </div>

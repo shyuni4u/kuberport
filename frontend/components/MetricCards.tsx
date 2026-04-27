@@ -30,7 +30,7 @@ export function MetricCards({ readyTotal, restarts, memory, accessURL }: Props) 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <Card>
-      <CardHeader className="pb-1 text-xs text-slate-500">{label}</CardHeader>
+      <CardHeader className="pb-1 text-xs text-muted-foreground">{label}</CardHeader>
       <CardContent className="pt-0 text-lg font-medium">{value}</CardContent>
     </Card>
   );

@@ -36,9 +36,9 @@ export function MetaRow({ meta, onChange, nameLocked, readOnly, hideTeam }: Prop
   const lockAll = readOnly === true;
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border bg-slate-50 px-4 py-2">
+    <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/40 px-4 py-2">
       <label className="flex items-center gap-2 text-xs">
-        <span className="text-slate-600">이름</span>
+        <span className="text-muted-foreground">이름</span>
         <Input
           className="w-48 text-sm"
           placeholder="템플릿 이름 (slug)"
@@ -48,7 +48,7 @@ export function MetaRow({ meta, onChange, nameLocked, readOnly, hideTeam }: Prop
         />
       </label>
       <label className="flex items-center gap-2 text-xs">
-        <span className="text-slate-600">표시 이름</span>
+        <span className="text-muted-foreground">표시 이름</span>
         <Input
           className="w-48 text-sm"
           placeholder="표시 이름"
@@ -59,7 +59,7 @@ export function MetaRow({ meta, onChange, nameLocked, readOnly, hideTeam }: Prop
       </label>
       {!hideTeam && (
         <label className="flex items-center gap-2 text-xs">
-          <span className="text-slate-600">팀</span>
+          <span className="text-muted-foreground">팀</span>
           <Input
             className="w-32 text-sm"
             value={meta.team ?? ""}

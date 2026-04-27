@@ -60,10 +60,10 @@ export function UserFormPreview(props: Props) {
   }, [isUIStateProps(props) ? JSON.stringify(props.uiState) : (props as { uiSpecYaml: string }).uiSpecYaml]);
 
   if (err) return <div className="text-sm text-red-600 whitespace-pre">{err}</div>;
-  if (!uiSpec) return <div className="text-sm text-slate-500">로딩 중…</div>;
+  if (!uiSpec) return <div className="text-sm text-muted-foreground">로딩 중…</div>;
   if (uiSpec.fields.length === 0) {
     return (
-      <div className="text-sm text-slate-500">
+      <div className="text-sm text-muted-foreground">
         아직 노출된 필드가 없습니다. UI 모드에서는 트리의 값을 <strong>노출</strong> 로 표시하면 여기 나타납니다. YAML 모드에서는 <code className="font-mono">ui-spec.yaml</code> 의 <code className="font-mono">fields[]</code> 를 추가하세요.
       </div>
     );

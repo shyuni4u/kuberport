@@ -88,9 +88,9 @@ export function RBACCheckPanel({ cluster, namespace, kinds }: Props) {
     <Card>
       <CardHeader className="text-sm font-medium">권한 확인</CardHeader>
       <CardContent className="flex flex-col gap-1 text-xs">
-        {loading && <span className="text-slate-500">확인 중…</span>}
+        {loading && <span className="text-muted-foreground">확인 중…</span>}
         {showPlaceholder && (
-          <span className="text-slate-500">
+          <span className="text-muted-foreground">
             클러스터/네임스페이스를 입력하면 권한을 확인합니다.
           </span>
         )}
