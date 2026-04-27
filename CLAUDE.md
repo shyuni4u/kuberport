@@ -80,7 +80,7 @@ kuberport/
 │   │   └── specs/                         ← 디자인 스펙 (다음 단계에 생성)
 │   └── decisions/                         ← ADR (필요 시 생성)
 └── scripts/
-    └── oci-capacity-retry/                ← OCI 인스턴스 launch 자동화 (cron 5분, 머신 이전 가능)
+    └── oci-capacity-retry/                ← OCI 인스턴스 launch 자동화 (cron 15분, 머신 이전 가능)
 ```
 
 ## 세션 시작 시: 개발 환경 먼저 확인

@@ -57,8 +57,11 @@ if grep -qE '<TENANCY_OCID>|<AD_NAME>|<SUBNET_OCID>|<IMAGE_OCID>' "$TARGET_DIR/c
   exit 1
 fi
 
-echo "[4/4] cron 등록 (5분 간격)"
-CRON_LINE="*/5 * * * * $TARGET_DIR/retry.sh >> $TARGET_DIR/cron.log 2>&1"
+echo "[4/4] cron 등록 (15분 간격)"
+# 15분 간격 — 5분이면 OCI 의 launch API rate-limit cool-down 보다 짧아 영원히 rate-limit
+# 응답만 받음 (실측: 5분 간격 4시간 운영 시 55회 시도 중 47회가 rate-limit, 실효 시도율 3%).
+# 15분은 hitrov/oci-arm-host-capacity 도 권장하는 안정 구간.
+CRON_LINE="*/15 * * * * $TARGET_DIR/retry.sh >> $TARGET_DIR/cron.log 2>&1"
 # `grep -v` 가 매치 없을 때 exit 1 반환 → pipefail 에 걸리는 걸 방지하기 위해 변수로 분리
 existing_crontab=$(crontab -l 2>/dev/null | grep -v "oci-capacity-retry/retry.sh" || true)
 { [[ -n "$existing_crontab" ]] && echo "$existing_crontab"; echo "$CRON_LINE"; } | crontab -
