@@ -60,7 +60,7 @@ docker buildx build \
   .
 ```
 
-Go 가 cross-compile 이라 두 아키 모두 빠름 (~1분/arch). distroless static 베이스라 결과물 작음 (< 30MB).
+Go 가 cross-compile 이라 두 아키 모두 빠름 (~1분/arch). distroless static 베이스라 결과물 작음 (~85MB — k8s.io/client-go 의존이 큼).
 
 ### Frontend 빌드
 
@@ -145,7 +145,7 @@ spec:
 | `denied: installation not allowed to Create organization package` | GHA workflow 의 `permissions.packages: write` 누락. 워크플로 파일 확인 |
 | GHCR 에서 이미지가 안 보임 | private 기본. "Your packages" → settings → visibility 변경 또는 organization 의 default 변경 |
 | `pnpm install --frozen-lockfile` 실패 | `pnpm-lock.yaml` 이 outdated. 로컬에서 `pnpm install` 후 lockfile 커밋 |
-| backend distroless 에 shell 없어서 디버깅 어려움 | 임시로 `gcr.io/distroless/static-debian12:debug-nonroot` 로 변경 — busybox 들어 있음. 디버깅 끝나면 `:nonroot` 복귀 |
+| backend distroless 에 shell 없어서 디버깅 어려움 | 임시로 `gcr.io/distroless/static-debian12:debug` 로 변경 — busybox 들어 있음 (`debug-nonroot` 태그는 존재하지 않음). 디버깅 끝나면 `:nonroot` 복귀 |
 
 ## 영향 받는 문서
 
