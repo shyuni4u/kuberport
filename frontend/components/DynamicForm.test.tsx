@@ -155,6 +155,37 @@ describe("DynamicForm widget mapping", () => {
     render(<DynamicForm spec={spec} onSubmit={() => {}} />);
     expect(screen.queryByText(/pattern:/)).toBeNull();
   });
+
+  it("renders text Input + datalist for autocomplete", () => {
+    const spec: UISpec = {
+      fields: [
+        {
+          path: "spec.containers[0].image",
+          label: "Image",
+          type: "autocomplete",
+          values: ["nginx:1.25", "nginx:1.27", "httpd:2.4"],
+          required: true,
+        },
+      ],
+    };
+    const { container } = render(<DynamicForm spec={spec} onSubmit={() => {}} />);
+    const input = screen.getByLabelText(/Image/) as HTMLInputElement;
+    expect(input).toHaveAttribute("type", "text");
+    // The input is wired to a datalist by id; the datalist has one <option>
+    // per suggestion. The id is path-scoped (alphanumerics + hyphens) so a
+    // single form with multiple autocomplete fields doesn't share lists.
+    const listId = input.getAttribute("list");
+    expect(listId).toBeTruthy();
+    const datalist = container.querySelector(`datalist#${CSS.escape(listId!)}`);
+    expect(datalist).not.toBeNull();
+    const options = datalist!.querySelectorAll("option");
+    expect(options.length).toBe(3);
+    expect(Array.from(options).map((o) => (o as HTMLOptionElement).value)).toEqual([
+      "nginx:1.25",
+      "nginx:1.27",
+      "httpd:2.4",
+    ]);
+  });
 });
 
 describe("DynamicForm submit", () => {
