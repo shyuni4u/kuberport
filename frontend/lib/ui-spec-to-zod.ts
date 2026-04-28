@@ -45,6 +45,23 @@ export type UISpecField =
       values: string[];
       default?: string;
       required?: boolean;
+    }
+  | {
+      // `autocomplete` is a string with a list of suggested values surfaced
+      // via a datalist — admin nudges the choice without restricting it. The
+      // backend treats the field exactly like `string` (`values` is advisory),
+      // so the zod schema is z.string() with the same length/pattern knobs.
+      path: string;
+      label: string;
+      help?: string;
+      type: "autocomplete";
+      values: string[];
+      default?: string;
+      required?: boolean;
+      minLength?: number;
+      maxLength?: number;
+      pattern?: string;
+      placeholder?: string;
     };
 
 export type UISpec = { fields: UISpecField[] };
@@ -87,6 +104,14 @@ export function schemaFromUISpec(spec: UISpec): z.ZodObject<Record<string, ZodTy
           );
         }
         zs = z.enum([first, ...rest]);
+        break;
+      }
+      case "autocomplete": {
+        let s = z.string();
+        if (f.minLength !== undefined) s = s.min(f.minLength);
+        if (f.maxLength !== undefined) s = s.max(f.maxLength);
+        if (f.pattern) s = s.regex(new RegExp(f.pattern));
+        zs = s;
         break;
       }
     }

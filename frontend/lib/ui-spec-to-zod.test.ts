@@ -304,6 +304,76 @@ describe("schemaFromUISpec", () => {
     });
   });
 
+  describe("autocomplete", () => {
+    it("accepts suggested values", () => {
+      const spec: UISpec = {
+        fields: [
+          {
+            path: "image",
+            label: "Image",
+            type: "autocomplete",
+            values: ["nginx:1.25", "nginx:1.27"],
+            required: true,
+          },
+        ],
+      };
+      const schema = schemaFromUISpec(spec);
+      expect(schema.safeParse({ image: "nginx:1.27" }).success).toBe(true);
+    });
+
+    it("accepts free input outside the suggestions (key difference from enum)", () => {
+      const spec: UISpec = {
+        fields: [
+          {
+            path: "image",
+            label: "Image",
+            type: "autocomplete",
+            values: ["nginx:1.25"],
+            required: true,
+          },
+        ],
+      };
+      const schema = schemaFromUISpec(spec);
+      const result = schema.safeParse({ image: "ghcr.io/internal/custom:v9" });
+      expect(result.success).toBe(true);
+    });
+
+    it("honors pattern when set", () => {
+      const spec: UISpec = {
+        fields: [
+          {
+            path: "image",
+            label: "Image",
+            type: "autocomplete",
+            values: ["nginx:1.25"],
+            pattern: "^[a-z]",
+            required: true,
+          },
+        ],
+      };
+      const schema = schemaFromUISpec(spec);
+      expect(schema.safeParse({ image: "Bad-Start" }).success).toBe(false);
+      expect(schema.safeParse({ image: "lowercase-start" }).success).toBe(true);
+    });
+
+    it("does not throw when autocomplete has empty values (vs enum which throws)", () => {
+      // Empty suggestion list is unusual but coherent — admin just hasn't
+      // filled it in yet. Renders as a plain text input. Unlike enum which
+      // requires at least one value to build a z.enum tuple.
+      const spec: UISpec = {
+        fields: [
+          {
+            path: "image",
+            label: "Image",
+            type: "autocomplete",
+            values: [],
+          },
+        ],
+      };
+      expect(() => schemaFromUISpec(spec)).not.toThrow();
+    });
+  });
+
   describe("required vs optional", () => {
     it("required: true rejects missing key", () => {
       const spec: UISpec = {
