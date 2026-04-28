@@ -250,12 +250,122 @@ Once everything from §9 and §10 is running (logged in as alice):
 
 ## Troubleshooting
 
-- **`cluster has no ca_bundle` on OpenAPI fetch.** As of the third-round
-  hardening pass, empty `ca_bundle` cluster registrations are rejected at
-  openapi proxy time to avoid silently trusting any cert. Either (a) register
-  the cluster WITH its CA (step 9 above already does — `KIND_CA`), or (b) for
-  bare-bones manual tests, export `KBP_DEV_ALLOW_INSECURE_CLUSTERS=true` on the
-  backend process. Never set this env in prod.
+### `cluster has no ca_bundle` on OpenAPI fetch
+
+As of the third-round hardening pass, empty `ca_bundle` cluster registrations are
+rejected at openapi proxy time to avoid silently trusting any cert. Either (a)
+register the cluster WITH its CA (step 9 above already does — `KIND_CA`), or (b)
+for bare-bones manual tests, export `KBP_DEV_ALLOW_INSECURE_CLUSTERS=true` on the
+backend process. Never set this env in prod.
+
+### kind cluster died between sessions (DB ↔ k8s drift recovery)
+
+**Observed 2026-04-28** — symptoms after a host reboot or Docker Desktop crash:
+
+- `/releases/<id>` renders header + status `unknown` + 0/0 metric + empty
+  instances table, with no explanation in the UI.
+- `/templates/<name>/versions/<v>/edit?mode=ui` is stuck on
+  "스키마 로딩 중…" forever.
+- Sidebar cluster picker still lists the dead cluster as if healthy
+  (no reachability check yet — Plan 8 T9).
+- Frontend log shows `502` on `/api/v1/clusters/<name>/openapi/...`.
+
+**Why it happens.** kind keeps cluster metadata in `~/.kube/config` and Docker
+keeps the control-plane container, both of which survive container death.
+kuberport's DB has the cluster row + `ca_bundle` pinned at registration time.
+If the container dies (host reboot, OOM, Docker Desktop restart with corrupt
+state), the row points to a dead endpoint and nothing in the app currently
+notices.
+
+A new kind cluster will have a **different CA**, so simply restarting won't fix
+the trust chain — the DB row's `ca_bundle` must be replaced.
+
+**Diagnosis.** First confirm you're actually in this state vs. a different
+network issue:
+
+```bash
+docker ps -a --filter 'label=io.x-k8s.kind.cluster=kuberport' --format '{{.Names}} {{.Status}}'
+# stale: "kuberport-control-plane Exited (...)"
+# healthy: "kuberport-control-plane Up X minutes"
+
+ss -tlnp 2>/dev/null | grep ':6443' || echo "nothing on 6443"
+# stale: "nothing on 6443"
+```
+
+**Recovery procedure.**
+
+1. **Delete the dead cluster** (also cleans `~/.kube/config`):
+
+   ```bash
+   kind delete cluster --name kuberport
+   ```
+
+2. **Recreate** `/tmp/kind-cluster.yaml` if missing (same content as §5 above,
+   with `hostPath` adjusted for your home directory) and bring kind back up:
+
+   ```bash
+   kind create cluster --config /tmp/kind-cluster.yaml --wait 2m
+   ```
+
+3. **Reapply RBAC bindings** (§6 above — `kuberport-admin` ClusterRoleBinding
+   + `kuberport-users` RoleBinding in `default`).
+
+4. **Sync the DB `ca_bundle` to the new cluster's CA** — this is the
+   easy-to-miss step. Without it the backend keeps failing TLS handshake against
+   the new apiserver and you'll see `502` on every `/v1/clusters/<name>/...`
+   call:
+
+   ```bash
+   KIND_CA_B64=$(kubectl --context kind-kuberport config view --raw --minify --flatten \
+     -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+   KIND_CA=$(echo "$KIND_CA_B64" | base64 -d)
+
+   docker exec -i docker-postgres-1 psql -U kuberport -d kuberport <<EOF
+   UPDATE clusters SET ca_bundle = \$ca\$$KIND_CA\$ca\$ WHERE name='kind';
+   SELECT name, length(ca_bundle) FROM clusters;
+   EOF
+   # expect: ca_bundle ~1100 bytes for kindest/node v1.30
+   ```
+
+   Dollar-quoted SQL (`$ca$ ... $ca$`) avoids shell/SQL escaping problems with
+   the multi-line PEM blob. If you have `jq` installed the standard idiom from
+   §9 also works.
+
+5. **Verify** the backend can now reach the new cluster end-to-end:
+
+   ```bash
+   ADM=$(curl -ks -X POST https://host.docker.internal:5556/token \
+     -d grant_type=password -d client_id=kuberport -d client_secret=local-dev-secret \
+     -d username=admin@example.com -d password=admin \
+     -d 'scope=openid email profile groups' \
+     | python3 -c 'import sys,json; print(json.load(sys.stdin)["id_token"])')
+
+   curl -s -o /dev/null -w 'HTTP %{http_code}\n' \
+     -H "Authorization: Bearer $ADM" \
+     http://localhost:8080/v1/clusters/kind/openapi/v1
+   # expect: HTTP 200
+   ```
+
+6. **Refresh the browser**. Release detail and UI-mode editor should both
+   unstick.
+
+**Stale releases left behind.** Releases that pointed to the previous instance
+of the cluster (e.g. `test-web` from earlier sessions) are still in the DB. Their
+k8s resources are gone with the old cluster. Until [Plan 8](superpowers/plans/2026-04-28-plan8-release-stale-cleanup.md)
+ships an admin-only force-delete UI, your options are:
+
+- **Redeploy the same release name on the new cluster.** The DB row stays and
+  the new k8s resources match the existing labels.
+- **Manually delete the row** after confirming it's actually orphaned:
+  `docker exec -i docker-postgres-1 psql -U kuberport -d kuberport -c "DELETE FROM releases WHERE name='<name>';"`
+
+**Prevention.** Tear down kind cleanly before host shutdown
+(`kind delete cluster --name kuberport`) — `docker stop` of the control-plane is
+also fine (`docker start` brings it back), but a hard kill (host reboot, Docker
+Desktop crash) often leaves the container in `Exited (127)` and the only
+reliable recovery is delete + recreate. Plan 9 (deferred) will add a
+reconciliation loop that detects this drift automatically; for now it's a
+manual playbook.
 
 ## Known limits
 
