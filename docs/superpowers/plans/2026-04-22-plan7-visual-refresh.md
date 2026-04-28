@@ -1,6 +1,6 @@
 # Plan 7 — Visual Refresh + i18n (2026-04-22)
 
-> **Status**: 📝 초안. 구현은 2026-04-23 이후.
+> **Status**: ✅ merged (PR #28).
 > Plan 6(post-MVP stabilization, PR #27) 머지 후 후속. **기능·라우트·백엔드 변경 없음 — 비주얼/레이아웃/디자인 토큰 + 국제화(ko/en)만.**
 
 ## 동기
