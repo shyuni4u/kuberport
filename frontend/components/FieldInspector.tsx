@@ -2,18 +2,30 @@
 
 import type { SchemaNode } from "@/lib/openapi";
 
+// Field types the editor supports. `enum` and `autocomplete` both render a
+// values list editor (admin-supplied options); the difference is enforcement
+// — `enum` rejects values outside the list at deploy time, `autocomplete`
+// only suggests them via a datalist and lets the user type anything.
+type UISpecType = "string" | "integer" | "boolean" | "enum" | "autocomplete";
+
 export type UIField =
   | { mode: "fixed"; fixedValue: unknown }
   | {
       mode: "exposed";
       uiSpec: {
         label: string;
-        type: "string" | "integer" | "boolean" | "enum";
+        type: UISpecType;
         min?: number; max?: number;
         pattern?: string; values?: string[];
         default?: unknown; required?: boolean; help?: string;
       };
     };
+
+// String-compatible types let the admin pick how the field should be
+// presented to end-users. The natural type from the OpenAPI schema is the
+// default; the toggle in the inspector lets them upgrade plain strings to
+// `enum` (strict) or `autocomplete` (suggested + free input).
+const STRING_COMPATIBLE: ReadonlyArray<UISpecType> = ["string", "enum", "autocomplete"];
 
 export function FieldInspector({
   path, node, value, onChange, onClear,
@@ -55,13 +67,66 @@ export function FieldInspector({
 
       {value?.mode === "exposed" && (
         <div className="space-y-2">
+          {/*
+            Type toggle for string-compatible schema slots. We hide it for
+            integer/boolean because the schema type is decisive there. The
+            three options map to:
+              - "자유 텍스트" (string)         → plain text input
+              - "선택지" (enum, strict)        → dropdown / toggle group
+              - "추천" (autocomplete, soft)    → text input + datalist hints
+            Switching from enum↔autocomplete preserves `values`; switching
+            into either from "string" starts with a single empty slot so the
+            list editor shows up immediately.
+          */}
+          {STRING_COMPATIBLE.includes(schemaType) && (
+            <div>
+              <label className="block text-xs mb-1">입력 방식</label>
+              <div className="flex gap-1">
+                {(["string", "enum", "autocomplete"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`flex-1 px-2 py-1 rounded text-xs ${
+                      value.uiSpec.type === t
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    }`}
+                    onClick={() => {
+                      const isList = t === "enum" || t === "autocomplete";
+                      const wasList =
+                        value.uiSpec.type === "enum" ||
+                        value.uiSpec.type === "autocomplete";
+                      onChange({
+                        ...value,
+                        uiSpec: {
+                          ...value.uiSpec,
+                          type: t,
+                          // Preserve values across enum↔autocomplete; seed an
+                          // empty list when entering list mode from "string".
+                          values: isList
+                            ? wasList
+                              ? value.uiSpec.values
+                              : value.uiSpec.values ?? [""]
+                            : value.uiSpec.values,
+                        },
+                      });
+                    }}
+                  >
+                    {t === "string" ? "자유 텍스트" : t === "enum" ? "선택지" : "추천"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <Labeled label="라벨" v={value.uiSpec.label}
             onChange={x => onChange({ ...value, uiSpec: { ...value.uiSpec, label: x } })}/>
           <Labeled label="기본값" v={String(value.uiSpec.default ?? "")}
             onChange={x => onChange({ ...value, uiSpec: { ...value.uiSpec, default: coerce(x, value.uiSpec.type) } })}/>
-          {value.uiSpec.type === "enum" && (
+          {(value.uiSpec.type === "enum" || value.uiSpec.type === "autocomplete") && (
             <div>
-              <label className="block text-xs mb-1">Values</label>
+              <label className="block text-xs mb-1">
+                {value.uiSpec.type === "enum" ? "선택지 (Values)" : "추천 항목 (Suggestions)"}
+              </label>
               <div className="space-y-1">
                 {(value.uiSpec.values ?? []).map((v, i) => (
                   <div key={i} className="flex gap-2">
@@ -123,20 +188,20 @@ function Labeled({ label, v, onChange }: { label: string; v: string; onChange: (
   );
 }
 
-function mapSchemaType(n: SchemaNode): "string" | "integer" | "boolean" | "enum" {
+function mapSchemaType(n: SchemaNode): UISpecType {
   if (n.enum) return "enum";
   if (n.type === "integer" || n.type === "number") return "integer";
   if (n.type === "boolean") return "boolean";
   return "string";
 }
 
-function defaultFor(t: "string" | "integer" | "boolean" | "enum"): unknown {
+function defaultFor(t: UISpecType): unknown {
   if (t === "integer") return 0;
   if (t === "boolean") return false;
   return "";
 }
 
-function coerce(raw: string, t: "string" | "integer" | "boolean" | "enum"): unknown {
+function coerce(raw: string, t: UISpecType): unknown {
   if (t === "integer") return raw === "" ? undefined : Number(raw);
   if (t === "boolean") return raw === "true";
   return raw;
