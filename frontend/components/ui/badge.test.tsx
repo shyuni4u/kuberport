@@ -11,8 +11,9 @@ describe("Badge variants", () => {
     const { container } = render(<Badge variant="warning">wip</Badge>);
     expect(container.firstChild).toHaveClass("bg-amber-100");
   });
-  it("renders muted variant with slate palette", () => {
+  it("renders muted variant with muted token palette", () => {
     const { container } = render(<Badge variant="muted">off</Badge>);
-    expect(container.firstChild).toHaveClass("bg-slate-100");
+    expect(container.firstChild).toHaveClass("bg-muted");
+    expect(container.firstChild).toHaveClass("text-muted-foreground");
   });
 });

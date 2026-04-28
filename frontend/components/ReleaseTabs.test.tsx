@@ -10,9 +10,9 @@ describe("ReleaseTabs", () => {
   it("marks active tab by pathname suffix", () => {
     render(<ReleaseTabs releaseId="abc" />);
     const logsLink = screen.getByRole("link", { name: "로그" });
-    expect(logsLink.className).toMatch(/border-blue-700/);
+    expect(logsLink.className).toMatch(/border-primary/);
     const overviewLink = screen.getByRole("link", { name: "개요" });
-    expect(overviewLink.className).not.toMatch(/border-blue-700/);
+    expect(overviewLink.className).not.toMatch(/border-primary/);
   });
 
   it("uses /releases/<id> as overview href", () => {

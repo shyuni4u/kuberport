@@ -49,7 +49,7 @@ export default async function TeamDetailPage({
 
       <h2 className="font-semibold mb-2">멤버</h2>
       <table className="w-full bg-white border rounded text-sm mb-6">
-        <thead className="text-xs text-slate-500">
+        <thead className="text-xs text-muted-foreground">
           <tr><th className="p-2 text-left">이메일</th><th className="p-2 text-left">역할</th><th className="p-2"></th></tr>
         </thead>
         <tbody>
@@ -75,9 +75,9 @@ export default async function TeamDetailPage({
           <option value="editor">editor</option>
           <option value="viewer">viewer</option>
         </select>
-        <button className="px-4 py-1.5 bg-blue-600 text-white rounded">추가</button>
+        <button className="px-4 py-1.5 bg-primary text-primary-foreground rounded">추가</button>
       </form>
-      <p className="text-xs text-slate-500 mt-2">대상 유저가 최소 한 번 이상 로그인한 적이 있어야 합니다.</p>
+      <p className="text-xs text-muted-foreground mt-2">대상 유저가 최소 한 번 이상 로그인한 적이 있어야 합니다.</p>
     </div>
   );
 }

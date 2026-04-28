@@ -86,20 +86,20 @@ export default async function TemplateDetail({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">{t.display_name}</h1>
-          <p className="text-slate-600">{t.description}</p>
+          <p className="text-muted-foreground">{t.description}</p>
         </div>
         {canEdit && latestVersion && (
           existingDraft ? (
             <Link
               href={`/templates/${name}/versions/${existingDraft.version}/edit?mode=${existingDraft.authoring_mode}`}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm"
+              className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm"
             >
               draft v{existingDraft.version} 편집
             </Link>
           ) : (
             <Link
               href={`/templates/${name}/versions/${latestVersion.version}/edit?mode=${latestVersion.authoring_mode}`}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm"
+              className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm"
             >
               + 새 버전
             </Link>
@@ -107,7 +107,7 @@ export default async function TemplateDetail({
         )}
       </div>
       {!canEdit && (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-muted-foreground">
           읽기 전용 — {isGlobalTemplate ? "글로벌 템플릿은 관리자만 편집할 수 있습니다." : "편집 권한이 없습니다."}
         </p>
       )}
@@ -119,20 +119,20 @@ export default async function TemplateDetail({
             <span
               className={`text-xs px-2 py-0.5 rounded ${
                 v.status === "published" ? "bg-green-100 text-green-800"
-                : v.status === "deprecated" ? "bg-slate-200 text-slate-700"
+                : v.status === "deprecated" ? "bg-muted text-foreground"
                 : "bg-yellow-100 text-yellow-800"
               }`}
             >
               {v.status}
             </span>
-            <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+            <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
               {v.authoring_mode === "yaml" ? "YAML" : "UI"}
             </span>
             {canEdit && (
               <>
                 <Link
                   href={`/templates/${name}/versions/${v.version}/edit?mode=${v.authoring_mode}`}
-                  className="text-blue-600 text-sm"
+                  className="text-primary text-sm"
                 >
                   편집
                 </Link>
@@ -140,7 +140,7 @@ export default async function TemplateDetail({
                   <>
                     <form action={publish}>
                       <input type="hidden" name="version" value={v.version} />
-                      <button className="text-blue-600 text-sm">Publish</button>
+                      <button className="text-primary text-sm">Publish</button>
                     </form>
                     <form action={deleteDraft}>
                       <input type="hidden" name="version" value={v.version} />
@@ -157,7 +157,7 @@ export default async function TemplateDetail({
                 {v.status === "deprecated" && (
                   <form action={undeprecate}>
                     <input type="hidden" name="version" value={v.version} />
-                    <button className="text-blue-600 text-sm">Undeprecate</button>
+                    <button className="text-primary text-sm">Undeprecate</button>
                   </form>
                 )}
               </>

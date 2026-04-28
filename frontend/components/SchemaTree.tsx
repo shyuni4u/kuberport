@@ -31,7 +31,7 @@ function FieldBadge({ mode }: { mode: "fixed" | "exposed" }) {
     );
   }
   return (
-    <span className="ml-1 rounded-sm bg-blue-50 px-1 text-[9px] text-blue-800">
+    <span className="ml-1 rounded-sm bg-accent px-1 text-[9px] text-primary">
       ● exposed
     </span>
   );
@@ -53,7 +53,7 @@ function renderNode(
       return (
         <li key={p} style={{ paddingLeft: depth * 12 }}>
           <span
-            className={`cursor-pointer hover:bg-slate-100 px-1 rounded ${selectedPath === p ? "bg-blue-100" : ""}`}
+            className={`cursor-pointer hover:bg-muted px-1 rounded ${selectedPath === p ? "bg-accent" : ""}`}
             onClick={() => {
               onSelect(p, child);
               if (hasKids) {
@@ -67,7 +67,7 @@ function renderNode(
           >
             {hasKids ? (isExp ? "▾ " : "▸ ") : "· "}
             {name}
-            <span className="text-slate-400 ml-2">{child.type ?? "?"}</span>
+            <span className="text-muted-foreground ml-2">{child.type ?? "?"}</span>
             {fieldMode && <FieldBadge mode={fieldMode} />}
           </span>
           {isExp && (
@@ -86,7 +86,7 @@ function renderNode(
     return (
       <li style={{ paddingLeft: depth * 12 }}>
         <span
-          className={`cursor-pointer hover:bg-slate-100 px-1 rounded ${selectedPath === p ? "bg-blue-100" : ""}`}
+          className={`cursor-pointer hover:bg-muted px-1 rounded ${selectedPath === p ? "bg-accent" : ""}`}
           onClick={() => {
             onSelect(p, node.items!);
             setExpanded(prev => {
@@ -97,7 +97,7 @@ function renderNode(
           }}
         >
           {isExp ? "▾ " : "▸ "}[0]
-          <span className="text-slate-400 ml-2">{node.items.type ?? "?"}</span>
+          <span className="text-muted-foreground ml-2">{node.items.type ?? "?"}</span>
           {fieldMode && <FieldBadge mode={fieldMode} />}
         </span>
         {isExp && (

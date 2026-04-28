@@ -1,0 +1,41 @@
+{
+  "shell": {
+    "nav": {
+      "catalog": "카탈로그",
+      "myReleases": "내 릴리스",
+      "templates": "템플릿",
+      "releases": "릴리스",
+      "teams": "팀"
+    },
+    "logout": "로그아웃",
+    "currentCluster": "현재 클러스터",
+    "openMenu": "메뉴 열기",
+    "localeSwitchLabel": "언어 선택"
+  },
+  "common": {
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "edit": "편집",
+    "loading": "로딩 중…",
+    "empty": "데이터가 없습니다."
+  },
+  "catalog": {
+    "title": "카탈로그",
+    "searchPlaceholder": "템플릿 검색…",
+    "emptyNoTemplates": "관리자가 아직 템플릿을 만들지 않았습니다.",
+    "emptyNoMatch": "일치하는 템플릿이 없습니다. 검색어나 태그 필터를 바꿔보세요.",
+    "card": {
+      "deploy": "배포하기 →"
+    }
+  },
+  "releases": {
+    "myTitle": "내 릴리스",
+    "table": {
+      "name": "이름",
+      "template": "템플릿",
+      "namespace": "네임스페이스",
+      "empty": "아직 배포된 릴리스가 없습니다."
+    }
+  }
+}

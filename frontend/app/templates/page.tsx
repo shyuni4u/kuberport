@@ -11,13 +11,13 @@ export default async function TemplatesPage() {
         <h1 className="text-xl font-bold">템플릿</h1>
         <Link
           href="/templates/new"
-          className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm"
+          className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-sm"
         >
           + 새 템플릿
         </Link>
       </div>
       <table className="w-full bg-white border rounded">
-        <thead className="text-xs text-slate-500">
+        <thead className="text-xs text-muted-foreground">
           <tr>
             <th className="p-2 text-left">이름</th>
             <th className="p-2 text-left">현재 버전</th>
@@ -30,13 +30,13 @@ export default async function TemplatesPage() {
               <td className="p-2">
                 <Link
                   href={`/templates/${t.name}`}
-                  className="text-blue-600"
+                  className="text-primary"
                 >
                   {t.display_name}
                 </Link>
               </td>
               <td className="p-2">v{t.current_version ?? "—"}</td>
-              <td className="p-2 text-slate-600">{t.description}</td>
+              <td className="p-2 text-muted-foreground">{t.description}</td>
             </tr>
           ))}
         </tbody>

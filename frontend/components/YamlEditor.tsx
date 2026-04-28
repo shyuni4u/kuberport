@@ -15,7 +15,7 @@ export function YamlEditor({
 }) {
   return (
     <div className="border rounded bg-white">
-      <div className="px-3 py-1.5 text-xs font-mono border-b bg-slate-50">
+      <div className="px-3 py-1.5 text-xs font-mono border-b bg-muted/40">
         {label}
       </div>
       <Monaco

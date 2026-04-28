@@ -48,7 +48,7 @@ export function InstancesTable({
             <TableCell>
               <Link
                 href={`/releases/${releaseId}/logs?instance=${i.name}`}
-                className="text-blue-700 hover:underline text-xs"
+                className="text-primary hover:underline text-xs"
               >
                 로그 →
               </Link>
