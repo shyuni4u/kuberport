@@ -53,7 +53,10 @@ describe("FieldInspector", () => {
       expect(screen.queryByText("입력 방식")).toBeNull();
     });
 
-    it("upgrading string → 선택지 (enum) seeds an empty value slot", () => {
+    it("upgrading string → 선택지 (enum) does NOT auto-seed values", () => {
+      // Auto-seeding `[""]` would produce `z.enum([""])` downstream, which
+      // accepts only the literal empty string — confusing footgun. The
+      // admin uses "+ 값 추가" to start the list explicitly.
       const { onChange } = harness({
         mode: "exposed",
         uiSpec: { label: "Image", type: "string", required: false },
@@ -62,10 +65,10 @@ describe("FieldInspector", () => {
       expect(onChange).toHaveBeenCalledOnce();
       const next = onChange.mock.calls[0][0] as Extract<UIField, { mode: "exposed" }>;
       expect(next.uiSpec.type).toBe("enum");
-      expect(next.uiSpec.values).toEqual([""]);
+      expect(next.uiSpec.values).toBeUndefined();
     });
 
-    it("upgrading string → 추천 (autocomplete) seeds an empty value slot", () => {
+    it("upgrading string → 추천 (autocomplete) also does NOT auto-seed", () => {
       const { onChange } = harness({
         mode: "exposed",
         uiSpec: { label: "Image", type: "string", required: false },
@@ -73,7 +76,7 @@ describe("FieldInspector", () => {
       fireEvent.click(screen.getByRole("button", { name: "추천" }));
       const next = onChange.mock.calls[0][0] as Extract<UIField, { mode: "exposed" }>;
       expect(next.uiSpec.type).toBe("autocomplete");
-      expect(next.uiSpec.values).toEqual([""]);
+      expect(next.uiSpec.values).toBeUndefined();
     });
 
     it("switching enum ↔ autocomplete preserves the values list", () => {

@@ -203,7 +203,8 @@ function FieldRow({
             </datalist>
           )}
           {field.help ? <FormDescription>{field.help}</FormDescription> : null}
-          {field.type === "string" && field.pattern ? (
+          {(field.type === "string" || field.type === "autocomplete") &&
+          field.pattern ? (
             <p className="text-xs text-muted-foreground">
               pattern: /{field.pattern}/
             </p>

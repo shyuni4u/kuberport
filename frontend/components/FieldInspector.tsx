@@ -92,22 +92,18 @@ export function FieldInspector({
                         : "bg-muted"
                     }`}
                     onClick={() => {
-                      const isList = t === "enum" || t === "autocomplete";
-                      const wasList =
-                        value.uiSpec.type === "enum" ||
-                        value.uiSpec.type === "autocomplete";
+                      // Always preserve `values` across type changes — never
+                      // auto-seed `[""]`. An auto-seeded empty string for
+                      // `enum` produces `z.enum([""])` downstream which
+                      // accepts only the literal empty string, leaving admins
+                      // wondering why valid inputs get rejected. Admin clicks
+                      // "+ 값 추가" to start the list.
                       onChange({
                         ...value,
                         uiSpec: {
                           ...value.uiSpec,
                           type: t,
-                          // Preserve values across enum↔autocomplete; seed an
-                          // empty list when entering list mode from "string".
-                          values: isList
-                            ? wasList
-                              ? value.uiSpec.values
-                              : value.uiSpec.values ?? [""]
-                            : value.uiSpec.values,
+                          values: value.uiSpec.values,
                         },
                       });
                     }}
