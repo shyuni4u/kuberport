@@ -186,7 +186,7 @@ func (h *Handlers) DeleteRelease(c *gin.Context) {
         }
     } else {
         log.Printf("force-delete: user=%s release_id=%s name=%s cluster=%s",
-            u.Email, c.Param("id"), rel.Name, rel.ClusterName)
+            u.Email, id, rel.Name, rel.ClusterName)
     }
 
     if err := h.deps.Store.DeleteRelease(ctx, id); err != nil {
@@ -249,9 +249,9 @@ func TestDeleteRelease_NoForce_StillRequiresK8sSuccess(t *testing.T) {
 `statusChipVariantFromRelease(status: string)` 매핑에 두 항목 추가:
 
 - `"cluster-unreachable"` → `"warning"` (amber).
-- `"resources-missing"` → `"error"` (red).
+- `"resources-missing"` → `"danger"` (red).
 
-StatusChip variant 자체는 신설하지 않는다 — 기존 4종 (healthy=success / warning=amber / error=red / unknown=neutral) 재사용으로 충분.
+StatusChip variant 자체는 신설하지 않는다 — `frontend/components/StatusChip.tsx` 의 기존 `StatusVariant` 4종 (`success` / `warning` / `danger` / `muted`) 재사용으로 충분.
 
 **`frontend/messages/ko.json`** (modify) — 키 추가:
 
