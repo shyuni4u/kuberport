@@ -86,6 +86,27 @@ describe("yamlToUIState", () => {
     expect(replicas.uiSpec?.max).toBe(5);
   });
 
+  it("round-trips type=autocomplete with values intact", () => {
+    // The yaml-to-ui-state side-loads ui-spec entries verbatim into
+    // UISpecEntry (lib/yaml-to-ui-state.ts:5–14, `type: string`), so any
+    // type the backend understands flows through unchanged. Pin the
+    // autocomplete-specific path so a future refactor can't quietly drop
+    // unknown types or silently coerce them to "string".
+    const { uiState } = yamlToUIState(sampleResources, `fields:
+  - path: Deployment[web].spec.template.spec.containers[0].image
+    label: 이미지
+    type: autocomplete
+    values:
+      - nginx:1.25
+      - nginx:1.27
+`);
+    const image =
+      uiState.resources[0].fields["spec.template.spec.containers[0].image"];
+    expect(image.mode).toBe("exposed");
+    expect(image.uiSpec?.type).toBe("autocomplete");
+    expect(image.uiSpec?.values).toEqual(["nginx:1.25", "nginx:1.27"]);
+  });
+
   it("warns when ui-spec references an unknown resource", () => {
     const { warnings } = yamlToUIState(sampleResources, `
 fields:

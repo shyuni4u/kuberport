@@ -268,3 +268,56 @@ func TestRender_PatternValidation(t *testing.T) {
 		require.ErrorContains(t, err, "pattern")
 	})
 }
+
+// TestRender_AutocompleteType verifies that `type: autocomplete` accepts
+// values OUTSIDE the suggestions list (unlike enum, which rejects). This is
+// the whole point of autocomplete — recommended options + free input.
+func TestRender_AutocompleteType(t *testing.T) {
+	uiSpec := `fields:
+  - path: Deployment[web].spec.template.spec.containers[0].image
+    label: "Image"
+    type: autocomplete
+    values: ["nginx:1.25", "nginx:1.27", "httpd:2.4"]
+`
+	t.Run("suggested value works", func(t *testing.T) {
+		values, _ := json.Marshal(map[string]any{
+			"Deployment[web].spec.template.spec.containers[0].image": "nginx:1.27",
+		})
+		_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+		require.NoError(t, err)
+	})
+	t.Run("non-suggested value also works (free input)", func(t *testing.T) {
+		values, _ := json.Marshal(map[string]any{
+			"Deployment[web].spec.template.spec.containers[0].image": "ghcr.io/internal/custom:v9",
+		})
+		_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+		require.NoError(t, err, "autocomplete must NOT enforce values")
+	})
+}
+
+// TestRender_AutocompleteHonorsPattern: pattern still applies to autocomplete
+// fields, same as plain string. Catches accidental "autocomplete bypasses
+// validation" regression.
+func TestRender_AutocompleteHonorsPattern(t *testing.T) {
+	uiSpec := `fields:
+  - path: Deployment[web].metadata.name
+    label: "Name"
+    type: autocomplete
+    pattern: "^[a-z]+$"
+    values: ["api", "web"]
+`
+	t.Run("matching free value", func(t *testing.T) {
+		values, _ := json.Marshal(map[string]any{
+			"Deployment[web].metadata.name": "worker",
+		})
+		_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+		require.NoError(t, err)
+	})
+	t.Run("non-matching value rejected", func(t *testing.T) {
+		values, _ := json.Marshal(map[string]any{
+			"Deployment[web].metadata.name": "BadName",
+		})
+		_, err := template.Render(resourcesYAML, uiSpec, values, template.Labels{})
+		require.ErrorContains(t, err, "pattern")
+	})
+}

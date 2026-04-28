@@ -87,6 +87,7 @@ function encodeValues(values: Record<string, unknown>): Record<string, unknown> 
  * - integer without full range → Input type="number"
  * - enum with ≤ 4 values → ToggleGroup (single-select)
  * - enum with > 4 values → Select
+ * - autocomplete → Input + native HTML5 datalist (free input + suggestions)
  * - string → Input type="text" (with optional pattern hint)
  */
 export function DynamicForm({
@@ -161,6 +162,13 @@ export function DynamicForm({
   );
 }
 
+// autocompleteListId is path-scoped so multiple autocomplete fields on the
+// same form don't share suggestion lists. Uses only [A-Za-z0-9_-] which are
+// valid id characters in HTML, even though the spec is more permissive.
+function autocompleteListId(path: string): string {
+  return `dyn-suggest-${path.replace(/[^A-Za-z0-9]/g, "-")}`;
+}
+
 function FieldRow({
   field,
   control,
@@ -181,8 +189,27 @@ function FieldRow({
             ) : null}
           </FormLabel>
           <FormControl>{renderWidget(field, rhf)}</FormControl>
+          {/*
+            Autocomplete renders an <Input list="..."> via renderWidget. The
+            matching <datalist> must be a sibling (not a child of the Input)
+            and we keep it outside <FormControl> so shadcn's Slot can still
+            forward the label/aria-* to the Input cleanly.
+          */}
+          {field.type === "autocomplete" && (
+            <datalist id={autocompleteListId(field.path)}>
+              {/*
+                Dedup with Set — admin-supplied lists shouldn't have dupes
+                but defending against accidental "+ 값 추가" double-clicks
+                avoids React's duplicate-key warning at the very least.
+              */}
+              {Array.from(new Set(field.values)).map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
+          )}
           {field.help ? <FormDescription>{field.help}</FormDescription> : null}
-          {field.type === "string" && field.pattern ? (
+          {(field.type === "string" || field.type === "autocomplete") &&
+          field.pattern ? (
             <p className="text-xs text-muted-foreground">
               pattern: /{field.pattern}/
             </p>
@@ -302,6 +329,22 @@ function renderWidget(
         </Select>
       );
     }
+
+    case "autocomplete":
+      // Native HTML5 datalist gives free input + dropdown of suggestions.
+      // The matching <datalist> is rendered by FieldRow as a sibling so
+      // FormControl's Slot can keep forwarding label/aria-* to the Input.
+      return (
+        <Input
+          type="text"
+          list={autocompleteListId(field.path)}
+          placeholder={field.placeholder}
+          value={typeof rhf.value === "string" ? rhf.value : ""}
+          onChange={(e) => rhf.onChange(e.target.value)}
+          onBlur={rhf.onBlur}
+          name={rhf.name}
+        />
+      );
 
     case "string":
     default:
