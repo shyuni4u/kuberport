@@ -13,7 +13,7 @@ a pod come up.
 
 - Docker Desktop (WSL2 integration on for Windows)
 - Go 1.22+, Node 20+, pnpm 9+
-- `atlas`, `kind` (`v0.23+`), `kubectl`
+- `atlas`, `kind` (`v0.23+`), `kubectl`, `jq`
 - `openssl`
 
 See [dev-setup.md](dev-setup.md) for Docker Desktop / WSL2 gotchas. Everything
@@ -320,16 +320,17 @@ ss -tlnp 2>/dev/null | grep ':6443' || echo "nothing on 6443"
      -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
    KIND_CA=$(echo "$KIND_CA_B64" | base64 -d)
 
-   docker exec -i docker-postgres-1 psql -U kuberport -d kuberport <<EOF
-   UPDATE clusters SET ca_bundle = \$ca\$$KIND_CA\$ca\$ WHERE name='kind';
+   docker exec -i docker-postgres-1 psql -U kuberport -d kuberport -v ca="$KIND_CA" <<'EOF'
+   UPDATE clusters SET ca_bundle = :'ca' WHERE name='kind';
    SELECT name, length(ca_bundle) FROM clusters;
    EOF
    # expect: ca_bundle ~1100 bytes for kindest/node v1.30
    ```
 
-   Dollar-quoted SQL (`$ca$ ... $ca$`) avoids shell/SQL escaping problems with
-   the multi-line PEM blob. If you have `jq` installed the standard idiom from
-   §9 also works.
+   The `-v ca="$KIND_CA"` flag binds the PEM blob to a psql variable, and
+   `:'ca'` interpolates it with proper SQL quoting — handles the embedded
+   newlines safely without shell/SQL escaping gymnastics. The quoted heredoc
+   (`<<'EOF'`) prevents the shell from re-interpreting anything inside.
 
 5. **Verify** the backend can now reach the new cluster end-to-end:
 
@@ -338,7 +339,7 @@ ss -tlnp 2>/dev/null | grep ':6443' || echo "nothing on 6443"
      -d grant_type=password -d client_id=kuberport -d client_secret=local-dev-secret \
      -d username=admin@example.com -d password=admin \
      -d 'scope=openid email profile groups' \
-     | python3 -c 'import sys,json; print(json.load(sys.stdin)["id_token"])')
+     | jq -r .id_token)
 
    curl -s -o /dev/null -w 'HTTP %{http_code}\n' \
      -H "Authorization: Bearer $ADM" \
