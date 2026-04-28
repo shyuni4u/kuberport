@@ -30,7 +30,7 @@ export default async function ReleaseDetailLayout({
     apiFetch("/v1/me"),
   ]);
   if (!relRes.ok) notFound();
-  const data = (await relRes.json()) as ReleaseHeaderData & { cluster: string };
+  const data = (await relRes.json()) as ReleaseHeaderData;
   const me = meRes.ok
     ? ((await meRes.json()) as { groups?: string[] })
     : { groups: [] };
