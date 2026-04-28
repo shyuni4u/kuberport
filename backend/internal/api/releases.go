@@ -393,9 +393,12 @@ func (h *Handlers) DeleteRelease(c *gin.Context) {
 	} else {
 		// Audit trail until a real audit log exists. The operator email +
 		// release id + name + cluster is the minimum to reconstruct who
-		// removed what.
+		// removed what. We log the raw URL param rather than the parsed
+		// `id` because `pgtype.UUID` doesn't implement `fmt.Stringer`, so
+		// `%s` would dump the struct fields instead of the canonical UUID
+		// text.
 		log.Printf("force-delete: user=%s release_id=%s name=%s cluster=%s",
-			u.Email, id, rel.Name, rel.ClusterName)
+			u.Email, c.Param("id"), rel.Name, rel.ClusterName)
 	}
 
 	if err := h.deps.Store.DeleteRelease(ctx, id); err != nil {

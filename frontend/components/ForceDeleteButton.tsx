@@ -24,7 +24,6 @@ export function ForceDeleteButton({ releaseId }: { releaseId: string }) {
         throw new Error(body || res.statusText);
       }
       router.push("/releases");
-      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setBusy(false);

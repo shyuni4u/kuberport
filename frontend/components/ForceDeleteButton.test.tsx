@@ -58,8 +58,12 @@ describe("ForceDeleteButton", () => {
     });
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith("/releases");
-      expect(refreshMock).toHaveBeenCalledTimes(1);
     });
+    // refresh() is intentionally NOT called — push() handles RSC fetch on
+    // the destination route. Calling refresh() before navigation completes
+    // would refresh the about-to-unmount /releases/<id> route, which is
+    // wasted work.
+    expect(refreshMock).not.toHaveBeenCalled();
   });
 
   it("shows error message on failed response and re-enables the button", async () => {
