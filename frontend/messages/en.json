@@ -36,6 +36,30 @@
       "template": "Template",
       "namespace": "Namespace",
       "empty": "No releases yet."
+    },
+    "status": {
+      "healthy": "healthy",
+      "warning": "warning",
+      "error": "error",
+      "unknown": "unknown",
+      "cluster-unreachable": "cluster unreachable",
+      "resources-missing": "resources missing"
+    },
+    "stale": {
+      "title": {
+        "cluster-unreachable": "Cluster is unreachable",
+        "resources-missing": "Resources not found in cluster"
+      },
+      "body": {
+        "cluster-unreachable": "Cluster {cluster} is not responding. This may be a transient network issue or the cluster may no longer be operational.",
+        "resources-missing": "The release record exists but no matching resources were found in the cluster. They may have been deleted externally or the cluster may have been rebuilt."
+      },
+      "contactAdmin": "Contact an admin to clean up this release.",
+      "forceDelete": {
+        "button": "Force delete",
+        "confirm": "This deletes only the DB record. The cluster will not be touched. Continue?",
+        "failed": "Delete failed: {error}"
+      }
     }
   }
 }
