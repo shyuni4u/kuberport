@@ -10,10 +10,11 @@ import (
 type FieldType string
 
 const (
-	TypeString  FieldType = "string"
-	TypeInteger FieldType = "integer"
-	TypeBoolean FieldType = "boolean"
-	TypeEnum    FieldType = "enum"
+	TypeString       FieldType = "string"
+	TypeInteger      FieldType = "integer"
+	TypeBoolean      FieldType = "boolean"
+	TypeEnum         FieldType = "enum"
+	TypeAutocomplete FieldType = "autocomplete"
 )
 
 type Field struct {
@@ -67,7 +68,9 @@ func (f Field) Validate(v any) error {
 		if f.Max != nil && n > *f.Max {
 			return fmt.Errorf("%s: above max %d", f.Label, *f.Max)
 		}
-	case TypeString:
+	case TypeString, TypeAutocomplete:
+		// Autocomplete is a string with advisory suggestions in `Values` —
+		// the suggestions are not enforced. Pattern still applies if set.
 		if f.patternRE == nil {
 			return nil
 		}
