@@ -78,7 +78,13 @@ export function schemaFromUISpec(spec: UISpec): z.ZodObject<Record<string, ZodTy
   for (const f of spec.fields) {
     let zs: ZodTypeAny;
     switch (f.type) {
-      case "string": {
+      // `string` and `autocomplete` share the validation shape — `values`
+      // on autocomplete is purely UX (datalist hints), so the zod schema is
+      // identical. We keep them as separate discriminants in `UISpecField`
+      // so the renderer can pick the right widget, but collapse the schema
+      // codepath here to keep both in sync.
+      case "string":
+      case "autocomplete": {
         let s = z.string();
         if (f.minLength !== undefined) s = s.min(f.minLength);
         if (f.maxLength !== undefined) s = s.max(f.maxLength);
@@ -104,14 +110,6 @@ export function schemaFromUISpec(spec: UISpec): z.ZodObject<Record<string, ZodTy
           );
         }
         zs = z.enum([first, ...rest]);
-        break;
-      }
-      case "autocomplete": {
-        let s = z.string();
-        if (f.minLength !== undefined) s = s.min(f.minLength);
-        if (f.maxLength !== undefined) s = s.max(f.maxLength);
-        if (f.pattern) s = s.regex(new RegExp(f.pattern));
-        zs = s;
         break;
       }
     }

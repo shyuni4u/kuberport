@@ -197,7 +197,12 @@ function FieldRow({
           */}
           {field.type === "autocomplete" && (
             <datalist id={autocompleteListId(field.path)}>
-              {field.values.map((v) => (
+              {/*
+                Dedup with Set — admin-supplied lists shouldn't have dupes
+                but defending against accidental "+ 값 추가" double-clicks
+                avoids React's duplicate-key warning at the very least.
+              */}
+              {Array.from(new Set(field.values)).map((v) => (
                 <option key={v} value={v} />
               ))}
             </datalist>

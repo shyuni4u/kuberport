@@ -71,12 +71,16 @@ func (f Field) Validate(v any) error {
 	case TypeString, TypeAutocomplete:
 		// Autocomplete is a string with advisory suggestions in `Values` —
 		// the suggestions are not enforced. Pattern still applies if set.
-		if f.patternRE == nil {
-			return nil
-		}
+		// We always type-check (even when no pattern is set) so a JSON
+		// number/bool sent for a string field is rejected at validate time
+		// instead of being silently passed through to the rendered YAML
+		// where it would surface as a confusing k8s API error.
 		s, ok := v.(string)
 		if !ok {
 			return fmt.Errorf("%s: not a string", f.Label)
+		}
+		if f.patternRE == nil {
+			return nil
 		}
 		if !f.patternRE.MatchString(s) {
 			return fmt.Errorf("%s: does not match pattern %q", f.Label, f.Pattern)
