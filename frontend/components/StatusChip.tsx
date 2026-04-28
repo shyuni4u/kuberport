@@ -28,9 +28,11 @@ export function statusChipVariantFromRelease(status: string): StatusVariant {
     case "healthy":
       return "success";
     case "warning":
+    case "cluster-unreachable":
       return "warning";
     case "error":
     case "failed":
+    case "resources-missing":
       return "danger";
     case "deprecated":
       return "muted";

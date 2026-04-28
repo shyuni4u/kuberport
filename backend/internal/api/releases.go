@@ -267,29 +267,35 @@ func (h *Handlers) GetRelease(c *gin.Context) {
 
 	u, ok := auth.UserFrom(ctx)
 	if !ok {
-		respondReleaseOverview(c, rel, nil)
+		respondReleaseOverview(c, rel, nil, "unknown")
 		return
 	}
 	cli, err := h.deps.K8sFactory.NewWithToken(rel.ClusterApiUrl, rel.ClusterCaBundle.String, u.IDToken)
 	if err != nil {
-		respondReleaseOverview(c, rel, nil)
+		respondReleaseOverview(c, rel, nil, "cluster-unreachable")
 		return
 	}
 
 	instances, err := cli.ListInstances(ctx, rel.Namespace, rel.Name)
 	if err != nil {
-		respondReleaseOverview(c, rel, nil)
+		respondReleaseOverview(c, rel, nil, "cluster-unreachable")
+		return
+	}
+	if len(instances) == 0 {
+		respondReleaseOverview(c, rel, instances, "resources-missing")
 		return
 	}
 
-	respondReleaseOverview(c, rel, instances)
+	respondReleaseOverview(c, rel, instances, "")
 }
 
-// respondReleaseOverview writes the release detail response.
-// If instances is nil, status is "unknown" (k8s unavailable). The
-// instances field is normalized to [] (never null) so JSON consumers
-// can call .map / .reduce without defensive coercion.
-func respondReleaseOverview(c *gin.Context, rel store.GetReleaseByIDRow, instances []k8s.Instance) {
+// respondReleaseOverview writes the release detail response. statusOverride
+// pins a specific status string (Plan 8: "cluster-unreachable" /
+// "resources-missing" / "unknown" for the no-auth fallback) — pass "" to
+// fall back to instance-derived `abstractStatus`. The instances field is
+// normalized to [] (never null) so JSON consumers can call .map / .reduce
+// without defensive coercion.
+func respondReleaseOverview(c *gin.Context, rel store.GetReleaseByIDRow, instances []k8s.Instance, statusOverride string) {
 	if instances == nil {
 		instances = []k8s.Instance{}
 	}
@@ -299,7 +305,10 @@ func respondReleaseOverview(c *gin.Context, rel store.GetReleaseByIDRow, instanc
 			ready++
 		}
 	}
-	status := abstractStatus(instances)
+	status := statusOverride
+	if status == "" {
+		status = abstractStatus(instances)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"id": rel.ID, "name": rel.Name,
 		"template":        gin.H{"name": rel.TemplateName, "version": rel.TemplateVersion},
@@ -359,21 +368,44 @@ func (h *Handlers) DeleteRelease(c *gin.Context) {
 		return
 	}
 
-	cli, err := h.deps.K8sFactory.NewWithToken(rel.ClusterApiUrl, rel.ClusterCaBundle.String, u.IDToken)
-	if err != nil {
-		writeError(c, http.StatusInternalServerError, "k8s-error", err.Error())
+	// Plan 8 escape hatch: when the cluster is unreachable or its workloads
+	// have been externally removed, an admin needs to clean up the orphan
+	// DB row without going through k8s. Restricted to admins because it
+	// bypasses the safety check that "release exists in cluster" — letting
+	// non-admin owners do this would let them lose track of running
+	// workloads on a transient network blip.
+	force := c.Query("force") == "true"
+	if force && !isAdmin(c) {
+		writeError(c, http.StatusForbidden, "rbac-denied", "force delete requires admin")
 		return
 	}
-	if err := cli.DeleteByRelease(ctx, rel.Namespace, rel.Name); err != nil {
-		writeError(c, http.StatusBadGateway, "k8s-error", err.Error())
-		return
+
+	if !force {
+		cli, err := h.deps.K8sFactory.NewWithToken(rel.ClusterApiUrl, rel.ClusterCaBundle.String, u.IDToken)
+		if err != nil {
+			writeError(c, http.StatusInternalServerError, "k8s-error", err.Error())
+			return
+		}
+		if err := cli.DeleteByRelease(ctx, rel.Namespace, rel.Name); err != nil {
+			writeError(c, http.StatusBadGateway, "k8s-error", err.Error())
+			return
+		}
+	} else {
+		// Audit trail until a real audit log exists. The operator email +
+		// release id + name + cluster is the minimum to reconstruct who
+		// removed what. We log the raw URL param rather than the parsed
+		// `id` because `pgtype.UUID` doesn't implement `fmt.Stringer`, so
+		// `%s` would dump the struct fields instead of the canonical UUID
+		// text.
+		log.Printf("force-delete: user=%s release_id=%s name=%s cluster=%s",
+			u.Email, c.Param("id"), rel.Name, rel.ClusterName)
 	}
 
 	if err := h.deps.Store.DeleteRelease(ctx, id); err != nil {
 		writeError(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"deleted": true})
+	c.JSON(http.StatusOK, gin.H{"deleted": true, "force": force})
 }
 
 func parseUUID(s string) (pgtype.UUID, error) {

@@ -36,6 +36,30 @@
       "template": "템플릿",
       "namespace": "네임스페이스",
       "empty": "아직 배포된 릴리스가 없습니다."
+    },
+    "status": {
+      "healthy": "정상",
+      "warning": "주의",
+      "error": "오류",
+      "unknown": "알 수 없음",
+      "cluster-unreachable": "클러스터 응답 없음",
+      "resources-missing": "리소스 없음"
+    },
+    "stale": {
+      "title": {
+        "cluster-unreachable": "클러스터에 접근할 수 없습니다",
+        "resources-missing": "클러스터에 해당 리소스가 없습니다"
+      },
+      "body": {
+        "cluster-unreachable": "클러스터 {cluster} 가 응답하지 않습니다. 일시적인 네트워크 문제이거나, 더 이상 운영되지 않는 클러스터일 수 있습니다.",
+        "resources-missing": "릴리스 레코드는 있지만 클러스터에 매칭되는 리소스가 없습니다. 외부에서 삭제됐거나 클러스터가 재구성됐을 수 있습니다."
+      },
+      "contactAdmin": "이 릴리스를 정리하려면 관리자에게 문의하세요.",
+      "forceDelete": {
+        "button": "강제 삭제",
+        "confirm": "이 릴리스의 DB 레코드만 삭제합니다. 클러스터에는 영향을 주지 않습니다. 계속하시겠습니까?",
+        "failed": "삭제 실패: {error}"
+      }
     }
   }
 }
