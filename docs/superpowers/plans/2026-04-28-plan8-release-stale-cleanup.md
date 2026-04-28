@@ -1,7 +1,7 @@
 # Plan 8 — Release Stale Cleanup (2026-04-28)
 
-> **Status**: 📝 초안. Plan 7 (visual refresh + i18n) 머지 후 후속.
-> **Stage 1 only.** 백그라운드 reconcile 루프 / SA 토큰 / DB 컬럼 추가 (= Stage 2) 는 별도 플랜으로 미룸.
+> **Status**: ✅ merged (PR #35). Plan 7 (visual refresh + i18n) 머지 후 후속.
+> **Stage 1 only.** 백그라운드 reconcile 루프 / SA 토큰 / DB 컬럼 추가 (= Stage 2) 는 Plan 9 자리에 별도 플랜으로 미룸 (CLAUDE.md plan 표 참조).
 
 ## 동기
 

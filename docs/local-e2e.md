@@ -267,7 +267,8 @@ backend process. Never set this env in prod.
 - `/templates/<name>/versions/<v>/edit?mode=ui` is stuck on
   "스키마 로딩 중…" forever.
 - Sidebar cluster picker still lists the dead cluster as if healthy
-  (no reachability check yet — Plan 8 T9).
+  (no reachability check yet — sidebar trusts the DB row; Stage 2
+  reconciler will surface this, see CLAUDE.md plan 9).
 - Frontend log shows `502` on `/api/v1/clusters/<name>/openapi/...`.
 
 **Why it happens.** kind keeps cluster metadata in `~/.kube/config` and Docker
