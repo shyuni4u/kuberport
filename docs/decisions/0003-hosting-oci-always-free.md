@@ -165,7 +165,8 @@ Best case (Phase 2 직행): 첫날부터 영구 $1/월. Worst case (Phase 1 → 
 ### Phase 1 (Bootstrap, OCI A1 capacity 확보 전에 시작)
 
 - [ ] OCI A1 인스턴스 생성 시도 — **잡히면 Phase 1 건너뛰고 Phase 2 로**
-- [ ] (A1 못 잡힘) GCP 계정 + 90일 크레딧 활성화, **예산 알림 $1 한도** 설정
+- [ ] (A1 못 잡힘 — capacity 부족이 흔함) **자동 재시도 cron 등록** ([docs/oci-capacity-retry.md](../oci-capacity-retry.md)). 15분 간격 launch 재시도 (5분은 OCI rate-limit cool-down 보다 짧아 영원히 막힘 — 실측), 머신 이전 가능
+- [ ] GCP 계정 + 90일 크레딧 활성화, **예산 알림 $1 한도** 설정
 - [ ] `e2-medium` VM (`asia-northeast3`, Ubuntu 24.04) 프로비저닝
 - [ ] 도메인 + Cloudflare A 레코드 → GCP VM IP
 - [x] **이미지 빌드 파이프라인 멀티아치 (`linux/amd64` + `linux/arm64`)** — 이 시점에 강제, Phase 2/3 이전 시 zero-touch ([docs/deploy/images.md](../deploy/images.md), `.github/workflows/build-images.yml`)
