@@ -1,4 +1,6 @@
-.PHONY: compose-up compose-down test e2e e2e-ui
+.PHONY: compose-up compose-down test e2e e2e-ui helm-sync helm-lint helm-snapshot helm-snapshot-update
+
+HELM_CHART_DIR := deploy/helm/kuberport
 
 compose-up:
 	docker compose -f deploy/docker/docker-compose.yml up -d
@@ -20,3 +22,30 @@ e2e: compose-up
 # stack (compose + kind + backend + frontend dev) to be running first.
 e2e-ui:
 	cd frontend && pnpm test:e2e
+
+# ----- Helm chart -------------------------------------------------------
+# schema.hcl is shipped twice on disk: the source of truth lives at
+# backend/migrations/schema.hcl, and the chart-embedded copy at
+# deploy/helm/kuberport/files/schema.hcl. Run helm-sync after editing the
+# source to keep them aligned. CI verifies they match.
+helm-sync:
+	cp backend/migrations/schema.hcl $(HELM_CHART_DIR)/files/schema.hcl
+
+helm-lint:
+	helm lint $(HELM_CHART_DIR) -f $(HELM_CHART_DIR)/ci/test-values.yaml
+
+# Diff the rendered chart against the checked-in golden snapshot. Fails
+# (non-zero exit) if they differ — that is the CI signal.
+helm-snapshot: helm-sync
+	@helm template kp $(HELM_CHART_DIR) \
+		-f $(HELM_CHART_DIR)/ci/test-values.yaml \
+		--namespace kuberport \
+		| diff -u $(HELM_CHART_DIR)/ci/snapshot.yaml -
+
+# Regenerate the golden snapshot. Run this when an intentional template
+# change is made; commit the diff alongside the template change.
+helm-snapshot-update: helm-sync
+	helm template kp $(HELM_CHART_DIR) \
+		-f $(HELM_CHART_DIR)/ci/test-values.yaml \
+		--namespace kuberport \
+		> $(HELM_CHART_DIR)/ci/snapshot.yaml
