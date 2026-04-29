@@ -119,7 +119,7 @@ deploy/helm/kuberport/
     ├── postgres-statefulset.yaml            # postgres.embedded=true 일 때만
     ├── postgres-service.yaml                # 위 동일
     ├── postgres-secret.yaml                 # 위 동일
-    └── migration-job.yaml                   # atlas migrate (Helm hook)
+    └── migration-configmap.yaml             # schema.hcl + atlas.hcl (initContainers 가 마운트)
 
 .github/workflows/
 └── helm.yml                                  # lint + golden snapshot + kind smoke (신규 워크플로우)
@@ -169,13 +169,17 @@ CLAUDE.md                                     # 플랜 표 업데이트 (Plan 9 
 - `tls.certManager.enabled=false` 일 때는 `tls.existingSecret` 또는 TLS 없음 (HTTP only — 로컬 디버깅용)
 - **테스트**: 두 모드(`certManager.enabled` true/false) 의 golden snapshot
 
-### T6. Atlas migration Job (Helm hook)
+### T6. Atlas migration — initContainer (구현 중 hook → initContainer 로 변경)
 
 - **마이그레이션 전략: 선언적 (`atlas schema apply`)** — 프로젝트는 `backend/migrations/schema.hcl` + `atlas.hcl` 로 desired state 를 직접 기술하는 방식 (`docs/local-e2e.md` §3, `docs/testing.md` 참조). 버전 기반(`atlas migrate apply`)으로 전환은 별도 결정사항(Plan 9 범위 밖).
-- pre-upgrade + pre-install hook (post 보다 pre 가 안전 — 마이그레이션 실패 시 새 backend 가 안 뜨도록)
-- image: 같은 backend 이미지 사용 + entrypoint 만 `atlas` 로 override 하거나, 별도 atlas 이미지. **결정**: 별도 `arigaio/atlas:latest` 사용 (backend 이미지 distroless 라 atlas binary 없음)
-- 마운트: ConfigMap 으로 `backend/migrations/{schema.hcl,atlas.hcl}` 두 파일을 컨테이너 안에 마운트 (예: `/migrations`). Job 의 `command` 는 `atlas schema apply --env <env> --url $DATABASE_URL --auto-approve` 형태. `atlas.hcl` 의 `env` 블록은 prod 용으로 chart 내에서 override 하거나 단일 `env "prod"` 블록을 별도로 추가
-- **테스트**: Job 이 hook 어노테이션(`helm.sh/hook: pre-install,pre-upgrade`)을 갖고 렌더되는지, image 가 `arigaio/atlas`, command 에 `schema apply` 가 들어가는지
+- **위치 변경: Helm hook Job → backend Deployment 의 initContainer.** 로컬 kind smoke 검증 중 발견된 chicken-and-egg 문제 — pre-install hook 은 chart 의 regular 리소스(Postgres StatefulSet/Service)가 아직 생성되기 전에 실행되어, embedded Postgres 가 있는 한 fresh install 에서 atlas 가 DB DNS 조회 자체를 실패. post-install 로 미루면 backend 가 schema 없이 먼저 떠서 CrashLoop. embedded PG 와는 어느 hook 으로도 양립 불가. initContainer 가 fresh install / upgrade / 재시작을 모두 자연스럽게 커버하고, atlas schema apply 는 idempotent 라 매 backend pod 시작 시 재실행되는 비용은 수 초.
+- backend Deployment 에 initContainers 두 개:
+  1. `wait-for-postgres` — `busybox:1.36`, `nc -z <pg-svc> 5432` 폴링. atlas 는 DNS 실패 시 즉시 종료하므로 TCP 가 열렸는지부터 확인.
+  2. `migrate` — `arigaio/atlas:latest` (backend 이미지 distroless 라 atlas binary 없음). image ENTRYPOINT 가 `atlas` 라 `command:` 대신 `args:` 사용 (안 그러면 PATH 에 atlas 없음으로 exec 실패). `args: [schema, apply, --env, prod, --auto-approve]`.
+- frontend Deployment 에도 `wait-for-backend` initContainer (`wget /healthz` 폴링) — frontend 가 자체 DB pool 을 가져서 schema 적용 전에 쿼리 시도하면 깨짐.
+- 마운트: 별도 `migration-configmap.yaml` (regular 리소스) 으로 chart 내 `files/schema.hcl` + chart 내 `atlas.hcl` env "prod" 블록(`getenv("DATABASE_URL")`) 을 `/migrations` 에 마운트.
+- **DATABASE_URL 주입**: `auth.create=true` 면 chart 가 값을 알고 있으므로 직접 env value 로 주입 (Secret 의존 회피, hook timing 영향 없음). `auth.create=false` 면 externalSecret 의 `secretKeyRef`.
+- **테스트**: 로컬 kind smoke — helm install 후 모든 Pod Running, `/healthz` 200, `/` 200, postgres 안에 8개 테이블(clusters, releases, sessions, team_memberships, teams, template_versions, templates, users) 모두 생성. golden snapshot 에 ConfigMap + Deployment initContainers 반영.
 
 ### T7. Golden snapshot test in CI
 
@@ -213,7 +217,7 @@ CLAUDE.md                                     # 플랜 표 업데이트 (Plan 9 
 | 항목 | 옵션 | 현재 결정 |
 |---|---|---|
 | Postgres sub-chart vs in-template | bitnami/postgresql vs 자체 작성 StatefulSet | 자체 작성 — 의존성·라이선스 회피, 단일노드라 충분 |
-| atlas 실행 위치 | initContainer vs Helm hook Job | Helm hook Job (pre-install, pre-upgrade) — initContainer 는 매 backend pod 재시작마다 도는 게 비효율 |
+| atlas 실행 위치 | initContainer vs Helm hook Job | **initContainer** (kind smoke 검증 중 정정) — embedded Postgres 와 hook 의 chicken-and-egg 가 어느 phase 로도 안 풀림. atlas 는 idempotent 라 재시작 비용 수 초로 허용 가능 |
 | atlas 마이그레이션 전략 | 선언적(`schema apply`) vs 버전 기반(`migrate apply`) | **선언적** — 프로젝트가 이미 `schema.hcl` 패턴 사용 중. 버전 기반 전환은 별도 결정 |
 | TLS 발급기 | cert-manager vs 직접 Secret 주입 | cert-manager 권장 (gated). Phase 1/2/3 모두 Let's Encrypt HTTP-01 가능 |
 | Ingress class default | traefik (k3s) vs nginx | traefik — ADR 0003 §공통 스택 |
