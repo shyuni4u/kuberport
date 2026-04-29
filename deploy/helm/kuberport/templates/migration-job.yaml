@@ -1,0 +1,66 @@
+{{- if .Values.migration.enabled -}}
+{{- $cmName := printf "%s-files" (include "kuberport.migration.fullname" .) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $cmName }}
+  labels:
+    {{- include "kuberport.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+data:
+  schema.hcl: |
+{{ .Files.Get "files/schema.hcl" | indent 4 }}
+  atlas.hcl: |
+    env "prod" {
+      src = "file:///migrations/schema.hcl"
+      url = getenv("DATABASE_URL")
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "kuberport.migration.fullname" . }}
+  labels:
+    {{- include "kuberport.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "kuberport.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: atlas
+          image: {{ .Values.migration.image | quote }}
+          imagePullPolicy: IfNotPresent
+          workingDir: /migrations
+          command:
+            - atlas
+            - schema
+            - apply
+            - --env
+            - prod
+            - --auto-approve
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kuberport.auth.secretName" . }}
+                  key: DATABASE_URL
+          volumeMounts:
+            - name: files
+              mountPath: /migrations
+      volumes:
+        - name: files
+          configMap:
+            name: {{ $cmName }}
+{{- end -}}
