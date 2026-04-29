@@ -1,7 +1,7 @@
 # Plan 9 — Helm Chart MVP (2026-04-29)
 
 > **Status**: 📝 draft. Plan 8 (release stale cleanup Stage 1) 머지 후 후속.
-> **번호 재배치**: 기존 CLAUDE.md 의 Plan 9 자리 (Stage 2 release reconciler — 미작성, deferred) 는 본 플랜이 잡고, reconciler 는 **Plan 12 (deferred)** 로 밀려난다. 새 순서:
+> **번호 재배치**: 기존 CLAUDE.md 의 Plan 9 자리 (Stage 2 release reconciler — 미작성, deferred) 는 본 플랜이 잡고, reconciler 는 **Plan 12 (deferred)** 로 밀려난다. 본 PR 에서 CLAUDE.md 표도 함께 갱신. 새 순서:
 > - Plan 9 = **Helm chart MVP** (이 문서)
 > - Plan 10 = GCP Phase 1 부트스트랩 (별도 플랜 예정)
 > - Plan 11 = e2e 확장 (별도 플랜 예정)
@@ -202,11 +202,10 @@ CLAUDE.md                                     # 플랜 표 업데이트 (Plan 9 
   - 환경별 (k3s, GKE, etc.) Ingress class / StorageClass 매트릭스
 - `values-gcp-phase1.yaml`: Plan 10 에서 그대로 `helm upgrade -f` 로 쓸 수 있는 형태로 미리 채움 (도메인은 `<your-domain.example>` placeholder)
 
-### T10. CLAUDE.md 플랜 표 업데이트
+### T10. ~~CLAUDE.md 플랜 표 업데이트~~
 
-- 기존 Plan 9 (deferred reconciler) 행을 Plan 12 로 옮김
-- 새 Plan 9 (Helm chart MVP) / Plan 10 (GCP Phase 1) / Plan 11 (e2e 확장) 행 추가
-- "현재 단계" 섹션 한 줄 갱신
+> 본 doc PR 에서 이미 처리됨 (Plan 9 Helm chart / Plan 10 GCP / Plan 11 e2e / Plan 12 deferred reconciler 행 + "현재 단계" 한 줄 갱신).
+> 구현 PR 에서는 **Plan 9 행의 상태만 `📝 draft` → `✅ merged (PR #N)`** 로 토글하면 됨.
 
 ## 결정/오픈 이슈
 
