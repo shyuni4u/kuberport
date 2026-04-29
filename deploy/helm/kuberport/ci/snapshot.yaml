@@ -70,397 +70,7 @@ data:
   OIDC_REDIRECT_URI: "https://kp.test.local/api/auth/callback"
   GO_API_BASE_URL: "http://kp-kuberport-backend:8080"
 ---
-# Source: kuberport/templates/backend-service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: kp-kuberport-backend
-  labels:
-    helm.sh/chart: kuberport-0.1.0
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/version: "0.1.0"
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/component: backend
-spec:
-  type: ClusterIP
-  ports:
-    - name: http
-      port: 8080
-      targetPort: http
-      protocol: TCP
-  selector:
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/component: backend
----
-# Source: kuberport/templates/frontend-service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: kp-kuberport-frontend
-  labels:
-    helm.sh/chart: kuberport-0.1.0
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/version: "0.1.0"
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/component: frontend
-spec:
-  type: ClusterIP
-  ports:
-    - name: http
-      port: 3000
-      targetPort: http
-      protocol: TCP
-  selector:
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/component: frontend
----
-# Source: kuberport/templates/postgres-service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: kp-kuberport-postgres
-  labels:
-    helm.sh/chart: kuberport-0.1.0
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/version: "0.1.0"
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/component: postgres
-spec:
-  type: ClusterIP
-  clusterIP: None       # headless — required for StatefulSet stable DNS
-  ports:
-    - name: postgres
-      port: 5432
-      targetPort: postgres
-      protocol: TCP
-  selector:
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/component: postgres
----
-# Source: kuberport/templates/backend-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: kp-kuberport-backend
-  labels:
-    helm.sh/chart: kuberport-0.1.0
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/version: "0.1.0"
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/component: backend
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: kuberport
-      app.kubernetes.io/instance: kp
-      app.kubernetes.io/component: backend
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: kuberport-0.1.0
-        app.kubernetes.io/name: kuberport
-        app.kubernetes.io/instance: kp
-        app.kubernetes.io/version: "0.1.0"
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/component: backend
-      annotations:
-        # Roll the Pod when ConfigMap or Secret content changes.
-        checksum/config: f20a4127b94c6b396498cc5de9356087701889c72e7a4b3e9ec72dade8162aff
-        checksum/secret: 643855a093a177e4e8ec7f294fa32bd14f58fd242ae7e0909ac7e9dc02671f23
-    spec:
-      securityContext:
-        fsGroup: 65532
-        runAsGroup: 65532
-        runAsNonRoot: true
-        runAsUser: 65532
-      containers:
-        - name: backend
-          image: ghcr.io/shyuni4u/kuberport-backend:0.1.0
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: http
-              containerPort: 8080
-              protocol: TCP
-          envFrom:
-            - configMapRef:
-                name: kp-kuberport-backend
-            - secretRef:
-                name: kp-kuberport-auth
-          readinessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: http
-            initialDelaySeconds: 15
-            periodSeconds: 20
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            readOnlyRootFilesystem: true
-          resources:
-            limits:
-              cpu: 500m
-              memory: 256Mi
-            requests:
-              cpu: 50m
-              memory: 64Mi
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-      volumes:
-        - name: tmp
-          emptyDir: {}
----
-# Source: kuberport/templates/frontend-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: kp-kuberport-frontend
-  labels:
-    helm.sh/chart: kuberport-0.1.0
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/version: "0.1.0"
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/component: frontend
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: kuberport
-      app.kubernetes.io/instance: kp
-      app.kubernetes.io/component: frontend
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: kuberport-0.1.0
-        app.kubernetes.io/name: kuberport
-        app.kubernetes.io/instance: kp
-        app.kubernetes.io/version: "0.1.0"
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/component: frontend
-      annotations:
-        checksum/config: c14e23194ab26b96ed0e0d6277f162ccee075a19dd465f20319bfafcf992fdb9
-        checksum/secret: 643855a093a177e4e8ec7f294fa32bd14f58fd242ae7e0909ac7e9dc02671f23
-    spec:
-      securityContext:
-        fsGroup: 65532
-        runAsGroup: 65532
-        runAsNonRoot: true
-        runAsUser: 65532
-      containers:
-        - name: frontend
-          image: ghcr.io/shyuni4u/kuberport-frontend:0.1.0
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: http
-              containerPort: 3000
-              protocol: TCP
-          envFrom:
-            - configMapRef:
-                name: kp-kuberport-frontend
-            - secretRef:
-                name: kp-kuberport-auth
-          # Frontend has no dedicated health endpoint; "/" returns 200 once
-          # Next.js is ready (and 307 to a login redirect counts as healthy
-          # under the default kubelet HTTP probe acceptance range 200–399).
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 30
-            periodSeconds: 30
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            readOnlyRootFilesystem: true
-          resources:
-            limits:
-              cpu: 500m
-              memory: 384Mi
-            requests:
-              cpu: 50m
-              memory: 96Mi
-          volumeMounts:
-            - name: tmp
-              mountPath: /tmp
-            # Next.js standalone server writes traces / temp files under /app/.next/cache.
-            - name: nextcache
-              mountPath: /app/.next/cache
-      volumes:
-        - name: tmp
-          emptyDir: {}
-        - name: nextcache
-          emptyDir: {}
----
-# Source: kuberport/templates/postgres-statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: kp-kuberport-postgres
-  labels:
-    helm.sh/chart: kuberport-0.1.0
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/version: "0.1.0"
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/component: postgres
-spec:
-  serviceName: kp-kuberport-postgres
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: kuberport
-      app.kubernetes.io/instance: kp
-      app.kubernetes.io/component: postgres
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: kuberport-0.1.0
-        app.kubernetes.io/name: kuberport
-        app.kubernetes.io/instance: kp
-        app.kubernetes.io/version: "0.1.0"
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/component: postgres
-    spec:
-      securityContext:
-        # postgres image runs as uid 999 (postgres). fsGroup so it can write
-        # the mounted PVC.
-        fsGroup: 999
-      containers:
-        - name: postgres
-          image: postgres:16-alpine
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: postgres
-              containerPort: 5432
-              protocol: TCP
-          envFrom:
-            - secretRef:
-                name: kp-kuberport-postgres
-          env:
-            # PGDATA cannot be the mount root — pg refuses to init on top of
-            # the lost+found directory created by some PVC provisioners.
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/postgresql/data
-          readinessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1'
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1'
-            initialDelaySeconds: 30
-            periodSeconds: 30
-          resources:
-            limits:
-              cpu: 1000m
-              memory: 512Mi
-            requests:
-              cpu: 50m
-              memory: 128Mi
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-        labels:
-          helm.sh/chart: kuberport-0.1.0
-          app.kubernetes.io/name: kuberport
-          app.kubernetes.io/instance: kp
-          app.kubernetes.io/version: "0.1.0"
-          app.kubernetes.io/managed-by: Helm
-          app.kubernetes.io/component: postgres
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        storageClassName: "standard"
-        resources:
-          requests:
-            storage: "10Gi"
----
-# Source: kuberport/templates/ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: kp-kuberport
-  labels:
-    helm.sh/chart: kuberport-0.1.0
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/version: "0.1.0"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  ingressClassName: "traefik"
-  tls:
-    - hosts:
-        - "kp.test.local"
-      secretName: "kp-kuberport-tls"
-  rules:
-    - host: "kp.test.local"
-      http:
-        paths:
-          # All external traffic goes to the frontend BFF.
-          # The Go backend stays on its in-cluster Service only —
-          # frontend Route Handlers proxy to it server-side.
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: kp-kuberport-frontend
-                port:
-                  number: 3000
----
-# Source: kuberport/templates/certificate.yaml
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: kp-kuberport
-  labels:
-    helm.sh/chart: kuberport-0.1.0
-    app.kubernetes.io/name: kuberport
-    app.kubernetes.io/instance: kp
-    app.kubernetes.io/version: "0.1.0"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  secretName: "kp-kuberport-tls"
-  dnsNames:
-    - "kp.test.local"
-  issuerRef:
-    kind: "ClusterIssuer"
-    name: "letsencrypt-prod"
----
-# Source: kuberport/templates/migration-job.yaml
+# Source: kuberport/templates/migration-configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -471,10 +81,6 @@ metadata:
     app.kubernetes.io/instance: kp
     app.kubernetes.io/version: "0.1.0"
     app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-weight": "-10"
-    "helm.sh/hook-delete-policy": before-hook-creation
 data:
   schema.hcl: |
     schema "public" {}
@@ -902,23 +508,98 @@ data:
       url = getenv("DATABASE_URL")
     }
 ---
-# Source: kuberport/templates/migration-job.yaml
-apiVersion: batch/v1
-kind: Job
+# Source: kuberport/templates/backend-service.yaml
+apiVersion: v1
+kind: Service
 metadata:
-  name: kp-kuberport-migrate
+  name: kp-kuberport-backend
   labels:
     helm.sh/chart: kuberport-0.1.0
     app.kubernetes.io/name: kuberport
     app.kubernetes.io/instance: kp
     app.kubernetes.io/version: "0.1.0"
     app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-weight": "-5"
-    "helm.sh/hook-delete-policy": before-hook-creation
+    app.kubernetes.io/component: backend
 spec:
-  backoffLimit: 2
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/component: backend
+---
+# Source: kuberport/templates/frontend-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: kp-kuberport-frontend
+  labels:
+    helm.sh/chart: kuberport-0.1.0
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/component: frontend
+---
+# Source: kuberport/templates/postgres-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: kp-kuberport-postgres
+  labels:
+    helm.sh/chart: kuberport-0.1.0
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: postgres
+spec:
+  type: ClusterIP
+  clusterIP: None       # headless — required for StatefulSet stable DNS
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/component: postgres
+---
+# Source: kuberport/templates/backend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kp-kuberport-backend
+  labels:
+    helm.sh/chart: kuberport-0.1.0
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kuberport
+      app.kubernetes.io/instance: kp
+      app.kubernetes.io/component: backend
   template:
     metadata:
       labels:
@@ -927,16 +608,47 @@ spec:
         app.kubernetes.io/instance: kp
         app.kubernetes.io/version: "0.1.0"
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/component: migration
+        app.kubernetes.io/component: backend
+      annotations:
+        # Roll the Pod when ConfigMap or Secret content changes.
+        checksum/config: f20a4127b94c6b396498cc5de9356087701889c72e7a4b3e9ec72dade8162aff
+        checksum/secret: 643855a093a177e4e8ec7f294fa32bd14f58fd242ae7e0909ac7e9dc02671f23
     spec:
-      restartPolicy: Never
-      containers:
-        - name: atlas
-          image: "arigaio/atlas:latest"
-          imagePullPolicy: IfNotPresent
-          workingDir: /migrations
+      securityContext:
+        fsGroup: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+      # Migration runs as initContainers (not a Helm hook) so that fresh
+      # `helm install` works with embedded Postgres — at pre-install hook time
+      # the Postgres StatefulSet/Service don't exist yet, so a hook Job can't
+      # reach the DB. Atlas schema apply is idempotent; the cost of re-running
+      # on each backend pod restart is a few seconds.
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
           command:
-            - atlas
+            - sh
+            - -c
+            - |
+              set -eu
+              # Block until Postgres TCP port is open. Avoids atlas's
+              # immediate DNS-resolution failure on first install.
+              until nc -z kp-kuberport-postgres 5432; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+        - name: migrate
+          image: "arigaio/atlas:latest"
+          workingDir: /migrations
+          # ENTRYPOINT ["atlas"] — use args, not command.
+          args:
             - schema
             - apply
             - --env
@@ -944,14 +656,315 @@ spec:
             - --auto-approve
           env:
             - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: kp-kuberport-auth
-                  key: DATABASE_URL
+              value: "postgres://kuberport:golden-snapshot-pgpass@kp-kuberport-postgres:5432/kuberport?sslmode=disable"
           volumeMounts:
-            - name: files
+            - name: migration-files
               mountPath: /migrations
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+      containers:
+        - name: backend
+          image: ghcr.io/shyuni4u/kuberport-backend:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: kp-kuberport-backend
+            - secretRef:
+                name: kp-kuberport-auth
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
       volumes:
-        - name: files
+        - name: tmp
+          emptyDir: {}
+        - name: migration-files
           configMap:
             name: kp-kuberport-migrate-files
+---
+# Source: kuberport/templates/frontend-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kp-kuberport-frontend
+  labels:
+    helm.sh/chart: kuberport-0.1.0
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kuberport
+      app.kubernetes.io/instance: kp
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: kuberport-0.1.0
+        app.kubernetes.io/name: kuberport
+        app.kubernetes.io/instance: kp
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: frontend
+      annotations:
+        checksum/config: c14e23194ab26b96ed0e0d6277f162ccee075a19dd465f20319bfafcf992fdb9
+        checksum/secret: 643855a093a177e4e8ec7f294fa32bd14f58fd242ae7e0909ac7e9dc02671f23
+    spec:
+      securityContext:
+        fsGroup: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+      # Frontend reads/writes the same DB as backend. Wait until the backend
+      # Service is responding /healthz — that signals migrations have been
+      # applied and the schema is current.
+      initContainers:
+        - name: wait-for-backend
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              until wget -q -O - --timeout=2 http://kp-kuberport-backend:8080/healthz >/dev/null; do
+                echo "waiting for backend..."
+                sleep 3
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+      containers:
+        - name: frontend
+          image: ghcr.io/shyuni4u/kuberport-frontend:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: kp-kuberport-frontend
+            - secretRef:
+                name: kp-kuberport-auth
+          # Frontend has no dedicated health endpoint; "/" returns 200 once
+          # Next.js is ready (and 307 to a login redirect counts as healthy
+          # under the default kubelet HTTP probe acceptance range 200–399).
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          resources:
+            limits:
+              cpu: 500m
+              memory: 384Mi
+            requests:
+              cpu: 50m
+              memory: 96Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            # Next.js standalone server writes traces / temp files under /app/.next/cache.
+            - name: nextcache
+              mountPath: /app/.next/cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nextcache
+          emptyDir: {}
+---
+# Source: kuberport/templates/postgres-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kp-kuberport-postgres
+  labels:
+    helm.sh/chart: kuberport-0.1.0
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: kp-kuberport-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kuberport
+      app.kubernetes.io/instance: kp
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: kuberport-0.1.0
+        app.kubernetes.io/name: kuberport
+        app.kubernetes.io/instance: kp
+        app.kubernetes.io/version: "0.1.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: postgres
+    spec:
+      securityContext:
+        # postgres image runs as uid 999 (postgres). fsGroup so it can write
+        # the mounted PVC.
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: kp-kuberport-postgres
+          env:
+            # PGDATA cannot be the mount root — pg refuses to init on top of
+            # the lost+found directory created by some PVC provisioners.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1'
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1'
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          helm.sh/chart: kuberport-0.1.0
+          app.kubernetes.io/name: kuberport
+          app.kubernetes.io/instance: kp
+          app.kubernetes.io/version: "0.1.0"
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/component: postgres
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: "10Gi"
+---
+# Source: kuberport/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kp-kuberport
+  labels:
+    helm.sh/chart: kuberport-0.1.0
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  ingressClassName: "traefik"
+  tls:
+    - hosts:
+        - "kp.test.local"
+      secretName: "kp-kuberport-tls"
+  rules:
+    - host: "kp.test.local"
+      http:
+        paths:
+          # All external traffic goes to the frontend BFF.
+          # The Go backend stays on its in-cluster Service only —
+          # frontend Route Handlers proxy to it server-side.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kp-kuberport-frontend
+                port:
+                  number: 3000
+---
+# Source: kuberport/templates/certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kp-kuberport
+  labels:
+    helm.sh/chart: kuberport-0.1.0
+    app.kubernetes.io/name: kuberport
+    app.kubernetes.io/instance: kp
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  secretName: "kp-kuberport-tls"
+  dnsNames:
+    - "kp.test.local"
+  issuerRef:
+    kind: "ClusterIssuer"
+    name: "letsencrypt-prod"

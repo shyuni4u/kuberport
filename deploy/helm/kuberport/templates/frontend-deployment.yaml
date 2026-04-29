@@ -25,6 +25,23 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Frontend reads/writes the same DB as backend. Wait until the backend
+      # Service is responding /healthz — that signals migrations have been
+      # applied and the schema is current.
+      initContainers:
+        - name: wait-for-backend
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              until wget -q -O - --timeout=2 http://{{ include "kuberport.backend.fullname" . }}:{{ .Values.backend.service.port }}/healthz >/dev/null; do
+                echo "waiting for backend..."
+                sleep 3
+              done
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
       containers:
         - name: frontend
           image: {{ include "kuberport.frontend.image" . }}

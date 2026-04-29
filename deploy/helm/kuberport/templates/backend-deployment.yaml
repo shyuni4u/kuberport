@@ -26,6 +26,54 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.migration.enabled }}
+      # Migration runs as initContainers (not a Helm hook) so that fresh
+      # `helm install` works with embedded Postgres — at pre-install hook time
+      # the Postgres StatefulSet/Service don't exist yet, so a hook Job can't
+      # reach the DB. Atlas schema apply is idempotent; the cost of re-running
+      # on each backend pod restart is a few seconds.
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              # Block until Postgres TCP port is open. Avoids atlas's
+              # immediate DNS-resolution failure on first install.
+              until nc -z {{ include "kuberport.postgres.fullname" . }} {{ .Values.postgres.service.port }}; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+        - name: migrate
+          image: {{ .Values.migration.image | quote }}
+          workingDir: /migrations
+          # ENTRYPOINT ["atlas"] — use args, not command.
+          args:
+            - schema
+            - apply
+            - --env
+            - prod
+            - --auto-approve
+          env:
+            - name: DATABASE_URL
+              {{- if .Values.auth.create }}
+              value: {{ include "kuberport.databaseUrl" . | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kuberport.auth.secretName" . }}
+                  key: DATABASE_URL
+              {{- end }}
+          volumeMounts:
+            - name: migration-files
+              mountPath: /migrations
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+      {{- end }}
       containers:
         - name: backend
           image: {{ include "kuberport.backend.image" . }}
@@ -61,6 +109,11 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if .Values.migration.enabled }}
+        - name: migration-files
+          configMap:
+            name: {{ include "kuberport.migration.fullname" . }}-files
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
