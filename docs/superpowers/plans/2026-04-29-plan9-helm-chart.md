@@ -26,7 +26,7 @@ ADR 0003 §"공통 스택" 은 모든 Phase 의 배포 단위가 **Helm chart + 
   - `postgres` StatefulSet + Service + PVC + Secret (gated by `postgres.embedded=true`, default true)
   - `Ingress` — 단일 호스트, **`/` → frontend** 한 개 룰만 (BFF 패턴이라 backend 는 in-cluster Service 로만 노출)
   - `Certificate` — cert-manager `ClusterIssuer` 참조 (gated by `tls.certManager.enabled`)
-  - 마이그레이션 `Job` — `atlas migrate apply`. Helm hook `post-install,post-upgrade`, `weight=-5`
+  - 마이그레이션 `Job` — `atlas schema apply` (선언적 — 프로젝트는 `backend/migrations/schema.hcl` + `atlas.hcl` 패턴). Helm hook `pre-install,pre-upgrade`, `weight=-5`
 - Values 분기 (클라우드 중립):
   - `ingress.className` (k3s = `traefik`, GKE = `gce`, etc.)
   - `postgres.storageClassName` (k3s = `local-path`, GKE = `standard-rwo`, etc.)
@@ -171,10 +171,11 @@ CLAUDE.md                                     # 플랜 표 업데이트 (Plan 9 
 
 ### T6. Atlas migration Job (Helm hook)
 
+- **마이그레이션 전략: 선언적 (`atlas schema apply`)** — 프로젝트는 `backend/migrations/schema.hcl` + `atlas.hcl` 로 desired state 를 직접 기술하는 방식 (`docs/local-e2e.md` §3, `docs/testing.md` 참조). 버전 기반(`atlas migrate apply`)으로 전환은 별도 결정사항(Plan 9 범위 밖).
 - pre-upgrade + pre-install hook (post 보다 pre 가 안전 — 마이그레이션 실패 시 새 backend 가 안 뜨도록)
 - image: 같은 backend 이미지 사용 + entrypoint 만 `atlas` 로 override 하거나, 별도 atlas 이미지. **결정**: 별도 `arigaio/atlas:latest` 사용 (backend 이미지 distroless 라 atlas binary 없음)
-- 마이그레이션 SQL 은 ConfigMap 으로 마운트 (`backend/migrations/schema.hcl` + 생성된 SQL)
-- **테스트**: Job 이 hook 어노테이션을 갖고 렌더되는지, image/command 가 atlas 인지
+- 마운트: ConfigMap 으로 `backend/migrations/{schema.hcl,atlas.hcl}` 두 파일을 컨테이너 안에 마운트 (예: `/migrations`). Job 의 `command` 는 `atlas schema apply --env <env> --url $DATABASE_URL --auto-approve` 형태. `atlas.hcl` 의 `env` 블록은 prod 용으로 chart 내에서 override 하거나 단일 `env "prod"` 블록을 별도로 추가
+- **테스트**: Job 이 hook 어노테이션(`helm.sh/hook: pre-install,pre-upgrade`)을 갖고 렌더되는지, image 가 `arigaio/atlas`, command 에 `schema apply` 가 들어가는지
 
 ### T7. Golden snapshot test in CI
 
@@ -213,6 +214,7 @@ CLAUDE.md                                     # 플랜 표 업데이트 (Plan 9 
 |---|---|---|
 | Postgres sub-chart vs in-template | bitnami/postgresql vs 자체 작성 StatefulSet | 자체 작성 — 의존성·라이선스 회피, 단일노드라 충분 |
 | atlas 실행 위치 | initContainer vs Helm hook Job | Helm hook Job (pre-install, pre-upgrade) — initContainer 는 매 backend pod 재시작마다 도는 게 비효율 |
+| atlas 마이그레이션 전략 | 선언적(`schema apply`) vs 버전 기반(`migrate apply`) | **선언적** — 프로젝트가 이미 `schema.hcl` 패턴 사용 중. 버전 기반 전환은 별도 결정 |
 | TLS 발급기 | cert-manager vs 직접 Secret 주입 | cert-manager 권장 (gated). Phase 1/2/3 모두 Let's Encrypt HTTP-01 가능 |
 | Ingress class default | traefik (k3s) vs nginx | traefik — ADR 0003 §공통 스택 |
 | 이미지 visibility | private + pullSecret vs public | **public 권장** (운영 마찰 최소). Plan 10 에서 첫 배포 직전 토글 |
