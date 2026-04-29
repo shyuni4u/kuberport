@@ -612,6 +612,10 @@ spec:
       annotations:
         # Roll the Pod when ConfigMap or Secret content changes.
         checksum/config: f20a4127b94c6b396498cc5de9356087701889c72e7a4b3e9ec72dade8162aff
+        # schema.hcl 변경 시 backend pod 가 재시작되며 atlas initContainer
+        # 가 새 스키마를 적용. 이 어노테이션이 없으면 migration ConfigMap
+        # 갱신만으로는 Deployment template 해시가 안 바뀌어 롤이 안 됨.
+        checksum/migration: 352df8b600ee6da59844eba29d4c83d1481cfae518220f79ff56d0fbc053e0f9
         checksum/secret: 643855a093a177e4e8ec7f294fa32bd14f58fd242ae7e0909ac7e9dc02671f23
     spec:
       securityContext:
@@ -625,6 +629,10 @@ spec:
       # reach the DB. Atlas schema apply is idempotent; the cost of re-running
       # on each backend pod restart is a few seconds.
       initContainers:
+        # Only meaningful for embedded Postgres (in-chart Service). External
+        # Postgres is the operator's responsibility to keep reachable; the
+        # `migrate` container's own Pod-level restartPolicy retries it on
+        # transient connection failure.
         - name: wait-for-postgres
           image: busybox:1.36
           command:
@@ -645,7 +653,7 @@ spec:
               - ALL
             readOnlyRootFilesystem: true
         - name: migrate
-          image: "arigaio/atlas:latest"
+          image: "arigaio/atlas:0.30.0"
           workingDir: /migrations
           # ENTRYPOINT ["atlas"] — use args, not command.
           args:

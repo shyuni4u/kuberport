@@ -117,12 +117,14 @@ tls:
   # Or reference a pre-existing TLS Secret (skip cert-manager block above)
   existingSecret: ""
 
-# ----- Migration Job (atlas schema apply) --------------------------------
+# ----- Migration (atlas schema apply, runs as backend initContainer) -----
 migration:
   enabled: true
-  image: arigaio/atlas:latest
-  # The chart mounts backend/migrations/{schema.hcl,atlas.hcl} via ConfigMap.
-  # See chart README for the workflow that ships those files into the chart.
+  # Pin a specific tag — `:latest` would silently shift between deploys and
+  # reproducibility matters for migration logic. Bump deliberately.
+  image: arigaio/atlas:0.30.0
+  # The chart mounts files/schema.hcl + a chart-generated atlas.hcl via the
+  # migration ConfigMap. See chart README for the schema sync workflow.
 
 # ----- Pod-level common settings -----------------------------------------
 podSecurityContext:

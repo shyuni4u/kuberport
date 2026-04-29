@@ -2,7 +2,8 @@
 
 Single chart that deploys backend (Go API), frontend (Next.js BFF), an
 optional in-cluster Postgres, an Ingress, an optional cert-manager
-Certificate, and a pre-install/pre-upgrade `atlas schema apply` Job.
+Certificate, and an `atlas schema apply` initContainer that runs ahead of
+the backend container on every Pod start.
 
 Target environments — k3s (Phase 1/2/3 per [ADR 0003](../../decisions/0003-hosting-oci-always-free.md))
 and any conformant Kubernetes cluster with cert-manager + an Ingress
@@ -61,8 +62,12 @@ helm upgrade kuberport deploy/helm/kuberport \
 ```
 
 `--reuse-values` keeps the secrets you passed at install time. The
-`pre-upgrade` migration Job runs `atlas schema apply` before new pods roll.
-If migration fails the new pods don't start; old pods stay live.
+backend Pod's `migrate` initContainer runs `atlas schema apply` before the
+backend container starts; if migration fails the new Pod never reaches Ready
+and rolling upgrade pauses, so old Pods stay live serving traffic.
+
+The frontend Pod has its own `wait-for-backend` initContainer (polls backend
+`/healthz`) so it doesn't open DB connections against an un-migrated schema.
 
 ## Uninstall
 
@@ -135,7 +140,7 @@ template change.
 | `postgres-{statefulset,service,secret}.yaml` | `postgres.embedded=true` |
 | `ingress.yaml` | `ingress.enabled=true` |
 | `certificate.yaml` | `tls.enabled=true` AND `tls.certManager.enabled=true` |
-| `migration-job.yaml` (ConfigMap + Job) | `migration.enabled=true` (default true) |
+| `migration-configmap.yaml` (schema.hcl + atlas.hcl) | `migration.enabled=true` (default true) — mounted by the backend Pod's `migrate` initContainer |
 
 ## Local validation
 
