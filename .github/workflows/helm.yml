@@ -1,0 +1,44 @@
+name: helm
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/helm/**"
+      - "backend/migrations/schema.hcl"
+      - ".github/workflows/helm.yml"
+      - "Makefile"
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/helm/**"
+      - "backend/migrations/schema.hcl"
+      - ".github/workflows/helm.yml"
+      - "Makefile"
+  workflow_dispatch:
+
+jobs:
+  lint-and-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.20.2
+
+      - name: Verify schema.hcl is in sync
+        run: |
+          if ! diff -q backend/migrations/schema.hcl deploy/helm/kuberport/files/schema.hcl; then
+            echo "::error::deploy/helm/kuberport/files/schema.hcl is out of sync with backend/migrations/schema.hcl"
+            echo "Run 'make helm-sync' (or copy manually) and commit the result."
+            diff -u backend/migrations/schema.hcl deploy/helm/kuberport/files/schema.hcl || true
+            exit 1
+          fi
+
+      - name: helm lint
+        run: make helm-lint
+
+      - name: Golden snapshot diff
+        run: make helm-snapshot
