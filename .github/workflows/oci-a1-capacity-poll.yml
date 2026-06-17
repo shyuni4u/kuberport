@@ -1,0 +1,163 @@
+name: oci-a1-capacity-poll
+
+# OCI Always Free A1.Flex capacity 폴링. 30분마다 한 번씩 launch 시도하고,
+# capacity 잡히면 GitHub Issue 생성 → repo watcher (= owner) 한테 이메일 자동 발송,
+# 그리고 workflow 자체를 disable 해서 폴링 중단.
+# 참고: ADR 0003 Phase 2, ~/oci-capacity-retry/retry.sh 의 GHA 포팅 버전.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install OCI CLI
+        run: pip install --user oci-cli
+
+      - name: Configure OCI
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_API_KEY_PEM: ${{ secrets.OCI_API_KEY_PEM }}
+        run: |
+          mkdir -p ~/.oci
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=$OCI_USER_OCID
+          fingerprint=$OCI_FINGERPRINT
+          tenancy=$OCI_TENANCY_OCID
+          region=$OCI_REGION
+          key_file=$HOME/.oci/oci_api_key.pem
+          EOF
+          printf '%s' "$OCI_API_KEY_PEM" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem ~/.oci/config
+
+      - name: Check if instance already exists
+        id: existing
+        env:
+          OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
+        run: |
+          existing=$(oci compute instance list \
+            --compartment-id "$OCI_COMPARTMENT_ID" \
+            --display-name kuberport \
+            --query 'data[?"lifecycle-state"!=`TERMINATED` && "lifecycle-state"!=`TERMINATING`]|[0].id' \
+            --raw-output 2>/dev/null || true)
+          if [ -n "$existing" ] && [ "$existing" != "null" ]; then
+            echo "instance_id=$existing" >> "$GITHUB_OUTPUT"
+            echo "::notice::Instance already exists: $existing"
+          fi
+
+      - name: Disable workflow if instance exists
+        if: steps.existing.outputs.instance_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow disable oci-a1-capacity-poll.yml --repo "${{ github.repository }}" || true
+
+      - name: Attempt launch
+        if: steps.existing.outputs.instance_id == ''
+        id: launch
+        env:
+          OCI_COMPARTMENT_ID: ${{ secrets.OCI_COMPARTMENT_ID }}
+          OCI_AD_NAME: ${{ secrets.OCI_AD_NAME }}
+          OCI_SUBNET_ID: ${{ secrets.OCI_SUBNET_ID }}
+          OCI_IMAGE_ID: ${{ secrets.OCI_IMAGE_ID }}
+          OCI_SSH_AUTHORIZED_KEY: ${{ secrets.OCI_SSH_AUTHORIZED_KEY }}
+        run: |
+          # FD rotation: stateless, time-based — 30min 단위로 1→2→3 순환
+          epoch_min=$(($(date +%s) / 60))
+          fd_idx=$(( (epoch_min / 30) % 3 + 1 ))
+          fd="FAULT-DOMAIN-$fd_idx"
+          echo "Attempting launch: AD=$OCI_AD_NAME FD=$fd shape=VM.Standard.A1.Flex 4c/24GB"
+
+          printf '%s\n' "$OCI_SSH_AUTHORIZED_KEY" > /tmp/ssh_authorized_key.pub
+
+          set +e
+          output=$(oci compute instance launch \
+            --availability-domain "$OCI_AD_NAME" \
+            --fault-domain "$fd" \
+            --compartment-id "$OCI_COMPARTMENT_ID" \
+            --display-name kuberport \
+            --shape VM.Standard.A1.Flex \
+            --shape-config '{"ocpus":4,"memoryInGBs":24}' \
+            --image-id "$OCI_IMAGE_ID" \
+            --subnet-id "$OCI_SUBNET_ID" \
+            --assign-public-ip true \
+            --boot-volume-size-in-gbs 100 \
+            --ssh-authorized-keys-file /tmp/ssh_authorized_key.pub \
+            --wait-for-state RUNNING \
+            --wait-interval-seconds 10 \
+            --max-wait-seconds 300 \
+            2>&1)
+          rc=$?
+          set -e
+
+          if [ $rc -eq 0 ]; then
+            instance_id=$(echo "$output" | python3 -c "import json,sys; print(json.load(sys.stdin)['data']['id'])")
+            vnic_id=$(oci compute instance list-vnics --instance-id "$instance_id" --query 'data[0].id' --raw-output)
+            public_ip=$(oci network vnic get --vnic-id "$vnic_id" --query 'data."public-ip"' --raw-output)
+            {
+              echo "instance_id=$instance_id"
+              echo "public_ip=$public_ip"
+              echo "fd=$fd"
+            } >> "$GITHUB_OUTPUT"
+            echo "::notice::🎉 SUCCESS — $fd, instance=$instance_id, public_ip=$public_ip"
+          elif echo "$output" | grep -qiE "out of (host )?capacity"; then
+            echo "::notice::Out of capacity on $fd"
+            exit 0
+          elif echo "$output" | grep -qiE "TooManyRequests|429|rate"; then
+            echo "::warning::Rate limited on $fd"
+            exit 0
+          elif echo "$output" | grep -qiE "instance.*already exists|already a (resource|instance)"; then
+            echo "::warning::Already exists race — next run will detect"
+            exit 0
+          else
+            echo "::error::Unexpected error: $output"
+            exit 1
+          fi
+
+      - name: Create success issue and disable workflow
+        if: steps.launch.outputs.instance_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REGION: ${{ secrets.OCI_REGION }}
+          INSTANCE_ID: ${{ steps.launch.outputs.instance_id }}
+          PUBLIC_IP: ${{ steps.launch.outputs.public_ip }}
+          FD: ${{ steps.launch.outputs.fd }}
+        run: |
+          gh issue create \
+            --title "🎉 OCI A1 capacity caught — kuberport launched" \
+            --body "$(cat <<EOF
+          OCI A1 capacity 가 잡혀서 kuberport 인스턴스가 생성됨.
+
+          - **Instance ID**: \`$INSTANCE_ID\`
+          - **Public IP**: \`$PUBLIC_IP\`
+          - **Fault Domain**: \`$FD\`
+          - **Region**: \`$REGION\`
+          - **시각 (UTC)**: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+          ## 다음 단계 (ADR 0003 Phase 2)
+
+          - [ ] SSH 접속: \`ssh -i ~/.ssh/oci_kuberport ubuntu@$PUBLIC_IP\`
+          - [ ] k3s 설치
+          - [ ] cert-manager + Let's Encrypt
+          - [ ] kuberport helm install (Plan 9)
+          - [ ] Cloudflare DNS A 레코드 갱신
+
+          ⚠️ **이 인스턴스는 절대 종료/재생성 금지** — capacity 다시 못 잡을 수 있음 (ADR 0003 §리스크 참조).
+
+          이 polling workflow 는 자동으로 비활성화됨.
+          EOF
+          )"
+          gh workflow disable oci-a1-capacity-poll.yml --repo "${{ github.repository }}"
