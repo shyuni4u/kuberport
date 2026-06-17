@@ -21,7 +21,7 @@
 
 | # | 화면 | 위치 | 문제 | 픽스 |
 |---|------|------|------|------|
-| C1 | 배포 폼 | `components/DeployClient.tsx:187-260`, `RBACCheckPanel.tsx:89-110`, `ResourcesPreview.tsx:32-35` | 가장 중요한 **사용자 화면이 통째로 하드코딩 한국어** — next-intl 우회. 로케일 토글이 이 화면에서 무력화. | `messages/{en,ko}.json` 에 `deploy` 네임스페이스 신설 후 추출. |
+| C1 | 배포 폼 | `app/catalog/[name]/deploy/DeployClient.tsx:187-260`, `components/RBACCheckPanel.tsx:89-110`, `components/ResourcesPreview.tsx:32-35` | 가장 중요한 **사용자 화면이 통째로 하드코딩 한국어** — next-intl 우회. 로케일 토글이 이 화면에서 무력화. | `messages/{en,ko}.json` 에 `deploy` 네임스페이스 신설 후 추출. |
 | C2 | 배포 폼 | `DeployClient.tsx:173-174, 256-258` | **제출 실패 시 raw 백엔드 에러 문자열 노출** — 403 RBAC 거부/422 k8s 검증 에러가 Go/JSON 덩어리로 비전문가 앞에 표시. | 상태코드 매핑(403→"권한 없음", 409→"이름 중복", 422→필드 에러) + 원문은 "자세히" disclosure 뒤로. |
 | C3 | 배포 폼 | `DeployClient.tsx:153-171, 156` | **이중 제출 버그** — 제출 중 버튼이 disabled 안 됨(`disabled` 만 체크, `submitting` 누락) → 릴리스 2개 생성 가능. 성공 피드백도 14px 회색 "처리 중…" 한 줄뿐. | `disabled={disabled || submitting}` + 버튼 스피너 + 도착 페이지 성공 토스트. |
 | C4 | 어드민 상세 | `app/templates/[name]/page.tsx:142-162` | **파괴적 액션에 확인 없음** — `삭제`/`Deprecate`/`Undeprecate`/`Publish` 가 클릭 즉시 server action 실행, 실패 시 에러 바운더리로 throw. | confirm 다이얼로그 (이미 `ForceDeleteButton` 에 `forceDelete.confirm` 패턴 존재 — 재사용). |
