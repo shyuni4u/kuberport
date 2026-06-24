@@ -7,6 +7,12 @@ Swagger가 OpenAPI spec을 UI로 바꿔 주는 것처럼, k8s 리소스를 **추
 
 **Plan 0~8 머지 완료.** 다음 우선순위는 **첫 사용자 피드백 루프** — Plan 9 (Helm chart MVP) → Plan 10 (GCP Phase 1 부트스트랩) → Plan 11 (e2e 확장). Stage 2 reconciler 는 Plan 12 (deferred) 로 밀어둠 (다중 클러스터 / 페일오버 필요해질 때 착수).
 
+> **▶ 다음 세션 TODO (2026-06-17 작성, 다른 PC 에서 재개 예정)** — 데모 전 UI/UX 마감. 상세: [docs/superpowers/plans/2026-06-17-pre-demo-ui-ux-finishing.md](docs/superpowers/plans/2026-06-17-pre-demo-ui-ux-finishing.md) (§"내일 작업 TODO"), PR #41.
+> 1. **Docker 켜고 로컬 스택 기동** (`docs/local-e2e.md`) — 라이브 화면 검증 전제. 안 켜면 오늘처럼 코드 추정 리뷰만 가능.
+> 2. (권장) **B1 dev 인증 우회 + B4 원커맨드 데모 스택** 먼저 — 이후 모든 UI 작업의 검증 속도를 좌우 (부록 B).
+> 3. **P0(🔴) 5건 TDD 픽스** — 배포 폼 i18n/raw 에러/이중 제출(C1~C3) → 파괴적 액션 confirm(C4) → 에디터 i18n(C5).
+> 완료되면 이 블록 삭제.
+
 스펙: [docs/superpowers/specs/2026-04-19-frontend-design-spec.md](docs/superpowers/specs/2026-04-19-frontend-design-spec.md) (4 화면: Admin UI 에디터 / 카탈로그 / 배포 폼 / 릴리스 상세)
 
 플랜 (순서대로 실행 — Plan 0 은 1-4 의 공통 기반):
