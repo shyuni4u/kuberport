@@ -35,7 +35,11 @@ echo "== Step 1/4: OS firewall (iptables) — open 80/443 =="
 ensure_rule() {
   local port="$1"
   if ! iptables -C INPUT -p tcp -m state --state NEW -m tcp --dport "${port}" -j ACCEPT 2>/dev/null; then
-    iptables -I INPUT 6 -p tcp -m state --state NEW -m tcp --dport "${port}" -j ACCEPT
+    # Insert at position 1 — safe regardless of how many rules already exist
+    # (a hardcoded higher index can fail with "Index of insertion too large"
+    # on a fresh image). Order vs the catch-all REJECT doesn't matter because
+    # the catch-all sits at the end of the chain.
+    iptables -I INPUT 1 -p tcp -m state --state NEW -m tcp --dport "${port}" -j ACCEPT
     echo "  inserted ACCEPT for ${port}/tcp"
   else
     echo "  rule already present for ${port}/tcp"
@@ -62,11 +66,20 @@ else
   echo "  k3s already installed, skipping"
 fi
 
-# Wait for the node to be Ready
-until k3s kubectl get nodes 2>/dev/null | grep -q ' Ready '; do
-  echo "  waiting for k3s node Ready..."
+# Wait for the node to be Ready (90s cap — k3s normally needs 10–30s on A1)
+echo "  waiting for k3s node Ready..."
+ready=false
+for i in {1..30}; do
+  if k3s kubectl get nodes 2>/dev/null | grep -q ' Ready '; then
+    ready=true
+    break
+  fi
   sleep 3
 done
+if ! $ready; then
+  echo "error: k3s node did not reach Ready within 90s. Check: systemctl status k3s" >&2
+  exit 1
+fi
 echo "  k3s node Ready"
 
 # Make kubectl available to the ubuntu user without sudo
@@ -95,12 +108,12 @@ echo "  waiting for cert-manager to be Available..."
 kubectl wait --for=condition=Available --timeout=180s deploy -n cert-manager --all
 echo "  cert-manager Ready"
 
-# Wait for the webhook to be live before applying the ClusterIssuer — applying
-# too early gives 'failed calling webhook' errors. The wait above mostly covers
-# this, but the webhook needs a couple extra seconds for its TLS bootstrap.
-sleep 10
-
-cat <<YAML | kubectl apply -f -
+# The cert-manager webhook needs a few extra seconds for its TLS bootstrap
+# even after the Deployment is Available. Apply with retries instead of a
+# blind sleep — the failure mode is a transient "failed calling webhook"
+# error that disappears once the webhook's TLS handshake works.
+echo "  applying ClusterIssuer..."
+issuer_yaml=$(cat <<YAML
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -116,16 +129,37 @@ spec:
           ingress:
             class: traefik
 YAML
+)
+applied=false
+for i in {1..15}; do
+  if echo "$issuer_yaml" | kubectl apply -f - 2>/dev/null; then
+    applied=true
+    break
+  fi
+  echo "  webhook not ready yet, retrying ($i/15)..."
+  sleep 4
+done
+if ! $applied; then
+  echo "error: ClusterIssuer apply failed after 60s of retries" >&2
+  exit 1
+fi
 
 # Verify the issuer becomes Ready (ACME account registration)
 echo "  waiting for ClusterIssuer Ready..."
+ready=false
 for i in {1..30}; do
   if kubectl get clusterissuer letsencrypt-prod -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
-    echo "  ClusterIssuer Ready"
+    ready=true
     break
   fi
   sleep 2
 done
+if ! $ready; then
+  echo "error: ClusterIssuer did not reach Ready within 60s." >&2
+  echo "  Check: kubectl describe clusterissuer letsencrypt-prod" >&2
+  exit 1
+fi
+echo "  ClusterIssuer Ready"
 
 echo
 echo "== Bootstrap complete =="

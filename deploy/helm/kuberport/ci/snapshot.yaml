@@ -615,7 +615,7 @@ spec:
         # schema.hcl 변경 시 backend pod 가 재시작되며 atlas initContainer
         # 가 새 스키마를 적용. 이 어노테이션이 없으면 migration ConfigMap
         # 갱신만으로는 Deployment template 해시가 안 바뀌어 롤이 안 됨.
-        checksum/migration: 352df8b600ee6da59844eba29d4c83d1481cfae518220f79ff56d0fbc053e0f9
+        checksum/migration: 2444efd74509efaaf24e532c2bf37e148f5f40abc53bd353ca29afb644f9fdec
         checksum/secret: 643855a093a177e4e8ec7f294fa32bd14f58fd242ae7e0909ac7e9dc02671f23
     spec:
       securityContext:
