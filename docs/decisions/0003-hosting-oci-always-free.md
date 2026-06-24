@@ -177,8 +177,15 @@ Best case (Phase 2 직행): 첫날부터 영구 $1/월. Worst case (Phase 1 → 
 
 ### Phase 2 (Target, OCI A1 확보 즉시)
 
-- [ ] OCI 계정 verification (카드 등록, Always Free 모드 확인)
-- [ ] `VM.Standard.A1.Flex` (4 OCPU / 24GB / 100GB boot) 프로비저닝 — 홈 리전
+> **진행 메모 (2026-06-24): A1 확보 완료 → Phase 1(GCP) 건너뛰고 Phase 2 직행.**
+> `VM.Standard.A1.Flex` **4 OCPU / 23GiB RAM / 96GB boot**, Ubuntu 24.04.4 LTS (aarch64,
+> 커널 `*-oracle`), OS 유저 `ubuntu`, 호스트명 `kuberport`. SSH 키 `~/.ssh/oci_kuberport`
+> (ed25519) 로 접속 확인됨. docker/k3s/kubectl/helm **전부 미설치 — 클린 상태.**
+> 공인 IP·바로 실행 가능한 ssh 명령은 PUBLIC 레포 노출 방지 위해 git 비추적
+> `docs/infra-local-notes.md` 에 보관 (`.gitignore`). 다음 작업: 아래 체크리스트 2번부터.
+
+- [x] OCI 계정 verification (카드 등록, Always Free 모드 확인)
+- [x] `VM.Standard.A1.Flex` (4 OCPU / 24GB / 100GB boot) 프로비저닝 — 홈 리전 *(실측 23GiB/96GB, Ubuntu 24.04 aarch64)*
 - [ ] Security List **및 OS 방화벽 (`iptables` — Ubuntu 이미지에서 기본 차단됨)** 80/443 인그레스 + SSH 22 (소스 IP 제한) 허용
 - [ ] k3s install + Traefik Ingress 동작 확인
 - [ ] (Phase 1 에서 왔다면) Postgres `pg_dump` import

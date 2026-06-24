@@ -12,6 +12,9 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Live infra notes (public IPs, ready-to-run ssh commands) — PUBLIC repo, keep out of git
+docs/infra-local-notes.md
+
 # Brainstorming session scratch (Claude Code superpowers)
 .superpowers/
 
